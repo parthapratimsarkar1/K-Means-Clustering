@@ -1,19 +1,94 @@
-# app.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
-# Load dataset
-players = pd.read_csv("Updated_Mall_Customers_with_Clusters.csv")
+# Set page config
+st.set_page_config(
+    page_title="Customer Segmentation App",
+    layout="wide"
+)
 
+# Load and prepare dataset
+@st.cache_data
+def load_data():
+    df = pd.read_csv("Updated_Mall_Customers_with_Clusters.csv")
+    return df
+
+def train_model(data):
+    # Select features for clustering
+    features = ["Age", "Annual Income (k$)", "Spending Score (1-100)"]
+    X = data[features]
+    
+    # Scale the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # Train KMeans model
+    kmeans = KMeans(n_clusters=5, random_state=42)
+    kmeans.fit(X_scaled)
+    
+    return kmeans, scaler
+
+# Main app
 st.title("Customer Segmentation App")
+st.write("Enter customer information to predict their segment")
 
-# Input for new data point
-age = st.number_input("Age", min_value=18, max_value=100)
-income = st.number_input("Annual Income (k$)", min_value=0, max_value=150)
-score = st.number_input("Spending Score (1-100)", min_value=0, max_value=100)
+# Load data
+try:
+    players = load_data()
+    
+    # Create columns for layout
+    col1, col2 = st.columns(2)
+    
+    # Input for new data point
+    with col1:
+        st.subheader("Customer Information")
+        age = st.number_input("Age", min_value=18, max_value=100, value=30)
+        income = st.number_input("Annual Income (k$)", min_value=0, max_value=150, value=50)
+        score = st.number_input("Spending Score (1-100)", min_value=0, max_value=100, value=50)
 
-if st.button("Predict Cluster"):
-    new_data_point = pd.DataFrame([[age, income, score]], columns=["Age", "Annual Income (k$)", "Spending Score (1-100)"])
-    # Perform normalization and find cluster, then display result
-    st.write(f"Predicted Cluster: {closest_cluster}")
+    # Train model
+    model, scaler = train_model(players)
+
+    # Prediction section
+    if st.button("Predict Cluster"):
+        # Prepare new data point
+        new_data_point = pd.DataFrame(
+            [[age, income, score]], 
+            columns=["Age", "Annual Income (k$)", "Spending Score (1-100)"]
+        )
+        
+        # Scale the new data point
+        new_data_scaled = scaler.transform(new_data_point)
+        
+        # Predict cluster
+        cluster = model.predict(new_data_scaled)[0]
+        
+        # Display results
+        with col2:
+            st.subheader("Prediction Results")
+            st.write(f"### Predicted Customer Segment: Cluster {cluster}")
+            
+            # Describe the cluster characteristics
+            cluster_data = players[players['Cluster'] == cluster]
+            
+            st.write("### Cluster Characteristics:")
+            stats = cluster_data[["Age", "Annual Income (k$)", "Spending Score (1-100)"]].describe()
+            st.dataframe(stats.round(2))
+            
+            # Additional insights
+            st.write("### Key Insights:")
+            st.write(f"- This cluster contains {len(cluster_data)} customers")
+            st.write(f"- Average age: {cluster_data['Age'].mean():.1f} years")
+            st.write(f"- Average income: ${cluster_data['Annual Income (k$)'].mean():.1f}k")
+            st.write(f"- Average spending score: {cluster_data['Spending Score (1-100)'].mean():.1f}")
+
+    # Display sample data
+    with st.expander("View Sample Data"):
+        st.dataframe(players.head())
+        
+except Exception as e:
+    st.error(f"Error: {str(e)}")
+    st.write("Please ensure the data file 'Updated_Mall_Customers_with_Clusters.csv' is in the correct location.")
