@@ -4,9 +4,9 @@ import pandas as pd
 from sklearn.cluster import KMeans
 
 # Load dataset
-players = pd.read_csv("Updated_Mall_Customers_with_Clusters.csv")
+players = pd.read_csv("Customers_Spending_with_Clusters.xls")
 
-st.title("Customer Segmentation App")
+st.title("Customer Spending App")
 
 # Input for new data point
 age = st.number_input("Age", min_value=18, max_value=100)
