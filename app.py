@@ -82,9 +82,6 @@ try:
         # Predict cluster
         cluster = model.predict(new_data_scaled)[0]
         
-        # Display results with animation
-        st.balloons()  # Trigger animation when cluster is predicted
-
         with col2:
             st.subheader("Prediction Results")
             # Flashing background effect for prediction result
