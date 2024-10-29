@@ -13,7 +13,7 @@ st.set_page_config(
 # Load and prepare dataset
 @st.cache_data
 def load_data():
-    df = pd.read_csv("Updated_Mall_Customers_with_Clusters.csv")
+    df = pd.read_csv("Customers_Spending_with_Clusters.xls")
     return df
 
 def train_model(data):
