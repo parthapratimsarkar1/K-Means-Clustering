@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 # Set page config
 st.set_page_config(
-    page_title="Customer Spending Application",
+    page_title="Customer Classify App",
     layout="wide"
 )
 
@@ -32,7 +32,7 @@ def train_model(data):
     return kmeans, scaler
 
 # Main app
-st.title("Customer Segmentation App")
+st.title("Customer Classify App")
 st.write("Enter customer information to predict their segment")
 
 # Load data
