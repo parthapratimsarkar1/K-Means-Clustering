@@ -107,4 +107,4 @@ try:
         
 except Exception as e:
     st.error(f"Error: {str(e)}")
-    st.write("Please ensure the data file 'Updated_Mall_Customers_with_Clusters.csv' is in the correct location.")
+    st.write("Please ensure the data file 'Customers_Spending_with_Clusters.xls' is in the correct location.")
