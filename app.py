@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 # Set page config
 st.set_page_config(
-    page_title="Customer Segmentation App",
+    page_title="Customer Spending Application",
     layout="wide"
 )
 
