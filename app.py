@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import numpy as np
 import time
 
 # Set up the Streamlit app title
@@ -28,13 +30,31 @@ if uploaded_file is not None:
         scaler = StandardScaler()
         X_normalized = scaler.fit_transform(X)
 
-        # Fit the KMeans model
-        n_clusters = st.number_input("Number of Clusters", min_value=1, max_value=10, value=5)
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        # Determine the optimal number of clusters using the Elbow Method
+        wcss = []
+        for i in range(1, 11):
+            kmeans = KMeans(n_clusters=i, random_state=42)
+            kmeans.fit(X_normalized)
+            wcss.append(kmeans.inertia_)
+
+        # Plot the Elbow Method graph
+        plt.figure(figsize=(10, 5))
+        plt.plot(range(1, 11), wcss, marker='o')
+        plt.title('Elbow Method For Optimal k')
+        plt.xlabel('Number of clusters')
+        plt.ylabel('WCSS')
+        plt.grid()
+        st.pyplot(plt)
+
+        # Automatically determine the optimal number of clusters (for simplicity, using a fixed number)
+        optimal_clusters = 5  # You can change this logic to a more sophisticated one
+
+        # Fit the KMeans model with the optimal number of clusters
+        kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
         kmeans.fit(X_normalized)
 
         # Create cluster specifications
-        cluster_specs = {i: f"Cluster {i}: Description based on analysis." for i in range(n_clusters)}
+        cluster_specs = {i: f"Cluster {i}: Description based on analysis." for i in range(optimal_clusters)}
 
         # Input for new data point
         age = st.number_input("Age", min_value=18, max_value=100)
