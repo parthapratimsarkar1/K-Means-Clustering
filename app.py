@@ -31,6 +31,22 @@ def train_model(data):
     
     return kmeans, scaler
 
+# CSS for flashing effect
+st.markdown("""
+    <style>
+    .flash {
+        animation: flash 1s ease-in-out infinite;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    @keyframes flash {
+        0% { background-color: #f3e5f5; }
+        50% { background-color: #e1bee7; }
+        100% { background-color: #f3e5f5; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Main app
 st.title("Customer Classify App")
 st.write("Enter customer information to predict their segment")
@@ -66,10 +82,13 @@ try:
         # Predict cluster
         cluster = model.predict(new_data_scaled)[0]
         
-        # Display results
+        # Display results with animation
+        st.balloons()  # Trigger animation when cluster is predicted
+
         with col2:
             st.subheader("Prediction Results")
-            st.write(f"### Predicted Customer Segment: Cluster {cluster}")
+            # Flashing background effect for prediction result
+            st.markdown(f"<div class='flash'><h3>Predicted Customer Segment: Cluster {cluster}</h3></div>", unsafe_allow_html=True)
             
             # Describe the cluster characteristics
             cluster_data = players[players['Cluster'] == cluster]
