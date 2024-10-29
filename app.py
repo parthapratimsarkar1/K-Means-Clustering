@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.cluster import KMeans
 
 # Load dataset
-players = pd.read_csv("Customers_Spending_with_Clusters.xls")
+players = pd.read_csv("Customers_Spending_with_Clusters.csv")
 
 st.title("Customer Spending App")
 
