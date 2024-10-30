@@ -85,7 +85,7 @@ try:
         with col2:
             st.subheader("Prediction Results")
             # Flashing background effect for prediction result
-            st.markdown(f"<div class='flash'><h3>Predicted Customer Segment: Cluster {cluster}</h3></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='flash'><h3>Customer Belong To: Cluster {cluster}</h3></div>", unsafe_allow_html=True)
             
             # Describe the cluster characteristics
             cluster_data = players[players['Cluster'] == cluster]
