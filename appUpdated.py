@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 st.set_page_config(page_title="Customer Segmentation System", layout="wide")
 
 class CustomerSegmentation:
-    def _init_(self, csv_path='Customers_Segmentation_with_Clusters.csv'):
+    def __init__(self, csv_path='Customers_Segmentation_with_Clusters.csv'):
         """Initialize the Customer Segmentation model"""
         try:
             self.df = pd.read_csv(csv_path)
@@ -155,5 +155,5 @@ def main():
         st.header("Sample Customer Data")
         st.dataframe(model.df)
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     main()
