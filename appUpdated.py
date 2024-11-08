@@ -109,8 +109,11 @@ def main():
         unsafe_allow_html=True
     )
     
-    # Initialize the model
-    model = CustomerSegmentation()
+    # Input CSV path manually
+    csv_path = st.text_input("Enter CSV file path", value="Customers_Segmentation_with_Clusters.csv")
+    
+    # Initialize the model with the specified CSV path
+    model = CustomerSegmentation(csv_path=csv_path)
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["Predict", "Cluster Overview", "Sample Data"])
