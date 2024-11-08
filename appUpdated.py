@@ -18,7 +18,7 @@ class CustomerSegmentation:
             self.cluster_descriptions = {
                 0: "Conservative Spenders (High Income): Customers earning high but spending less",
                 1: "Balanced Customers: Average in terms of earning and spending",
-                2: "Premium Customers: Earning Low and Spending high",
+                2: "Risk Customers: Earning Low and Spending high",
                 3: "Risk Group: Earning less but spending more",
                 4: "Budget Conscious: Earning less, spending less",
                 5: "Moderate Savers: Average earning, spending less"
