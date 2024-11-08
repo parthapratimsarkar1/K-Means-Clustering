@@ -28,7 +28,7 @@ st.markdown(
 st.markdown(
     """
     <div class="watermark">
-        <img src="path/to/logo.png" width="200">
+        <img src="Tezpur_University.png" width="200">
     </div>
     """,
     unsafe_allow_html=True
