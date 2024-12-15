@@ -193,16 +193,31 @@ class CustomerSegmentation:
             raise
     
     def analyze_clusters(self):
+        # Ensure that all possible clusters are processed
+        unique_clusters = sorted(self.df['Cluster'].unique())
         self.cluster_info = {}
-        for cluster in self.df['Cluster'].unique():
+        
+        for cluster in unique_clusters:
             cluster_data = self.df[self.df['Cluster'] == cluster]
-            self.cluster_info[cluster] = {
-                'size': len(cluster_data),
-                'avg_age': round(cluster_data['Age'].mean(), 1),
-                'avg_income': round(cluster_data['Income (INR)'].mean(), 1),
-                'avg_spending': round(cluster_data['Spending (1-100)'].mean(), 1),
-                'gender_distribution': cluster_data['Gender'].value_counts().to_dict()
-            }
+            
+            # Handle cases where a cluster might be empty
+            if len(cluster_data) > 0:
+                self.cluster_info[cluster] = {
+                    'size': len(cluster_data),
+                    'avg_age': round(cluster_data['Age'].mean(), 1),
+                    'avg_income': round(cluster_data['Income (INR)'].mean(), 1),
+                    'avg_spending': round(cluster_data['Spending (1-100)'].mean(), 1),
+                    'gender_distribution': cluster_data['Gender'].value_counts().to_dict()
+                }
+            else:
+                # Provide a default empty cluster info
+                self.cluster_info[cluster] = {
+                    'size': 0,
+                    'avg_age': 0,
+                    'avg_income': 0,
+                    'avg_spending': 0,
+                    'gender_distribution': {}
+                }
 
     def predict_segment(self, customer_id, gender, age, income, spending):
         input_data = np.array([[age, income, spending]])
@@ -232,6 +247,13 @@ def main():
     # Sidebar with improved styling
     with st.sidebar:
         st.markdown("### 📊 Customer Profile Analysis")
+        st.markdown("---")
+        
+        # Add an option to view the CSV file
+        if st.button("View Full Dataset"):
+            st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
+                         .format({'Cluster': 'Cluster {}'}))
+        
         st.markdown("---")
         
         customer_id = st.text_input("📋 Customer ID")
@@ -278,11 +300,17 @@ def main():
         st.markdown("### 📊 Cluster Overview")
         for cluster in sorted(model.cluster_descriptions.keys()):
             with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
-                info = model.cluster_info[cluster]
+                info = model.cluster_info.get(cluster, {
+                    'size': 0,
+                    'avg_age': 0,
+                    'avg_income': 0,
+                    'avg_spending': 0,
+                    'gender_distribution': {}
+                })
                 st.markdown(f"""
                     <div class="cluster-card">
                         <span class="cluster-badge">Cluster {cluster}</span>
-                        <p>{model.cluster_details[cluster]}</p>
+                        <p>{model.cluster_details.get(cluster, "No description available")}</p>
                         <hr>
                         <h4>Key Metrics:</h4>
                         <p>👥 Cluster Size: {info['size']} customers</p>
@@ -290,7 +318,7 @@ def main():
                         <p>💰 Average Income: ₹{info['avg_income']:,}</p>
                         <p>🛍️ Average Spending Score: {info['avg_spending']}</p>
                         <h4>Gender Distribution:</h4>
-                        <p>{'  |  '.join(f'{gender}: {count}' for gender, count in info['gender_distribution'].items())}</p>
+                        <p>{'  |  '.join(f'{gender}: {count}' for gender, count in info.get('gender_distribution', {}).items())}</p>
                     </div>
                 """, unsafe_allow_html=True)
     
