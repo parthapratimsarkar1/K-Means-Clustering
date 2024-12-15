@@ -3,8 +3,6 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import warnings
-import os
-
 warnings.filterwarnings('ignore')
 
 # Set page configuration
@@ -127,32 +125,7 @@ st.markdown("""
 class CustomerSegmentation:
     def __init__(self, csv_path='Customer-Dataset-With-Clustered.csv'):
         try:
-            # Add error handling for file loading
-            if not os.path.exists(csv_path):
-                st.error(f"Error: File {csv_path} not found. Please check the file path.")
-                raise FileNotFoundError(f"Could not find {csv_path}")
-
-            # Try multiple encodings
-            encodings = ['utf-8', 'latin-1', 'iso-8859-1']
-            for encoding in encodings:
-                try:
-                    self.df = pd.read_csv(csv_path, encoding=encoding)
-                    break
-                except UnicodeDecodeError:
-                    continue
-            else:
-                st.error("Could not read the CSV file with any standard encoding")
-                raise
-
-            # Validate required columns
-            required_columns = ['Age', 'Income (INR)', 'Spending (1-100)', 'Gender', 'Cluster']
-            missing_columns = [col for col in required_columns if col not in self.df.columns]
-            
-            if missing_columns:
-                st.error(f"Missing columns: {missing_columns}")
-                st.error(f"Columns in dataset: {list(self.df.columns)}")
-                raise ValueError(f"Missing required columns: {missing_columns}")
-
+            self.df = pd.read_csv(csv_path)
             self.process_data()
             self.analyze_clusters()
             self.cluster_descriptions = {
@@ -171,26 +144,16 @@ class CustomerSegmentation:
                 4: "Cost-conscious customers with lower income and spending",
                 5: "Average income earners with moderate saving habits"
             }
-        except Exception as e:
-            st.error(f"An error occurred while loading the data: {e}")
-            raise
+        except FileNotFoundError:
+            st.error(f"Error: Could not find {csv_path}")
             
     def process_data(self):
         le = LabelEncoder()
         self.df['Gender_Encoded'] = le.fit_transform(self.df['Gender'])
         self.gender_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-        
-        # Specify the exact column names from your dataset
         self.features = ['Age', 'Income (INR)', 'Spending (1-100)']
         self.scaler = StandardScaler()
-        
-        # Add error handling for scaling
-        try:
-            self.scaled_features = self.scaler.fit_transform(self.df[self.features])
-        except Exception as e:
-            st.error(f"Error in data scaling: {e}")
-            st.error("Ensure all feature columns contain numeric data")
-            raise
+        self.scaled_features = self.scaler.fit_transform(self.df[self.features])
     
     def analyze_clusters(self):
         self.cluster_info = {}
@@ -207,7 +170,6 @@ class CustomerSegmentation:
     def predict_segment(self, customer_id, gender, age, income, spending):
         input_data = np.array([[age, income, spending]])
         scaled_input = self.scaler.transform(input_data)
-        
         distances = []
         for cluster in self.df['Cluster'].unique():
             cluster_data = self.df[self.df['Cluster'] == cluster]
@@ -215,7 +177,6 @@ class CustomerSegmentation:
             scaled_center = self.scaler.transform([cluster_center])
             distance = np.linalg.norm(scaled_input - scaled_center)
             distances.append((cluster, distance))
-        
         predicted_cluster = min(distances, key=lambda x: x[1])[0]
         return predicted_cluster, self.cluster_info[predicted_cluster]
 
@@ -223,11 +184,7 @@ def main():
     # Header with professional styling
     st.markdown('<div class="main-header"><h1>Customer Segmentation System</h1></div>', unsafe_allow_html=True)
     
-    try:
-        model = CustomerSegmentation()
-    except Exception as e:
-        st.error("Failed to initialize the model. Please check your dataset.")
-        return
+    model = CustomerSegmentation()
     
     # Sidebar with improved styling
     with st.sidebar:
@@ -237,37 +194,34 @@ def main():
         customer_id = st.text_input("📋 Customer ID")
         gender = st.selectbox("👤 Gender", options=["Male", "Female"])
         age = st.number_input("🎂 Age", min_value=0, max_value=100, value=30)
-        income = st.number_input("💵 Income (INR)", min_value=0, value=50000)
+        income = st.number_input("💵 Income (INR)", min_value=0, value=50)
         spending = st.number_input("🛍️ Spending (1-100)", min_value=0, max_value=100, value=50)
         
         st.markdown("---")
         if st.button("Analyze Customer"):
             if all([customer_id, gender, age, income, spending]):
-                try:
-                    cluster, info = model.predict_segment(customer_id, gender, age, income, spending)
-                    
+                cluster, info = model.predict_segment(customer_id, gender, age, income, spending)
+                
+                st.markdown(f"""
+                    <div class="prediction-result">
+                        <h3 style="color: #1a237e;">Predicted Segment</h3>
+                        <div class="cluster-card">
+                            <span class="cluster-badge">Cluster {cluster}</span>
+                            <h4>{model.cluster_descriptions[cluster]}</h4>
+                            <p>{model.cluster_details[cluster]}</p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                with st.expander("📊 Detailed Statistics"):
                     st.markdown(f"""
-                        <div class="prediction-result">
-                            <h3 style="color: #1a237e;">Predicted Segment</h3>
-                            <div class="cluster-card">
-                                <span class="cluster-badge">Cluster {cluster}</span>
-                                <h4>{model.cluster_descriptions[cluster]}</h4>
-                                <p>{model.cluster_details[cluster]}</p>
-                            </div>
+                        <div class="metric-container">
+                            <p>👥 Cluster Size: {info['size']} customers</p>
+                            <p>📅 Average Age: {info['avg_age']} years</p>
+                            <p>💰 Average Income: ${info['avg_income']}k</p>
+                            <p>🛍️ Average Spending: {info['avg_spending']}</p>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    with st.expander("📊 Detailed Statistics"):
-                        st.markdown(f"""
-                            <div class="metric-container">
-                                <p>👥 Cluster Size: {info['size']} customers</p>
-                                <p>📅 Average Age: {info['avg_age']} years</p>
-                                <p>💰 Average Income: ₹{info['avg_income']:,}</p>
-                                <p>🛍️ Average Spending: {info['avg_spending']}</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                except Exception as e:
-                    st.error(f"Error in customer analysis: {e}")
             else:
                 st.warning("⚠️ Please complete all fields")
     
@@ -287,7 +241,7 @@ def main():
                         <h4>Key Metrics:</h4>
                         <p>👥 Cluster Size: {info['size']} customers</p>
                         <p>📅 Average Age: {info['avg_age']} years</p>
-                        <p>💰 Average Income: ₹{info['avg_income']:,}</p>
+                        <p>💰 Average Income: ${info['avg_income']}k</p>
                         <p>🛍️ Average Spending Score: {info['avg_spending']}</p>
                         <h4>Gender Distribution:</h4>
                         <p>{'  |  '.join(f'{gender}: {count}' for gender, count in info['gender_distribution'].items())}</p>
