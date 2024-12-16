@@ -11,3 +11,4 @@ wheel>=0.42.0
 # Optional visualization libraries
 matplotlib>=3.8.0
 seaborn>=0.13.0
+plotly
