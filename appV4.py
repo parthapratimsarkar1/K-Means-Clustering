@@ -75,7 +75,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class CustomerSegmentation:
-    def _init_(self, csv_path='Customer-Dataset-With-ClusteredDB.csv'):
+    def __init__(self, csv_path='Customer-Dataset-With-ClusteredDB.csv'):
         try:
             # Add error handling for file loading
             if not os.path.exists(csv_path):
@@ -127,15 +127,15 @@ class CustomerSegmentation:
     
     def generate_cluster_descriptions(self):
         self.cluster_descriptions = {
-           -0: "🏦 Noise Points",
-            0: "🏦 Conservative Spenders (High Income)",
-            1: "⚠ Risk Customers",
+            -0: "🚫 Noise Points (Outliers)",
+            0: "🏦 Conservative Spenders",
+            1: "⚠️ Risk Customers",
             2: "💎 Premium Customers",
-            3: "⚖ Balanced Group"
+            3: "⚖️ Balanced Group"
         }
         
         self.cluster_details = {
-           -0: "Noise" or "Outliers",
+            -0: "Unclassified or Outlier Data Points",
             0: "Middle Income, Moderate Spending",
             1: "Low Income, Low Spending",
             2: "High Income, High Spending",
@@ -336,5 +336,5 @@ def main():
         st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
                      .format({'Cluster': 'Cluster {}'}))
 
-if _name_ == '_main_':
-    main()
+if __name__ == '__main__':
+    main()
