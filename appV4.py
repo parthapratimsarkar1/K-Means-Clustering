@@ -2,14 +2,55 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import random
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import DBSCAN
 
-class CustomerSegmentationAnalysis:
+# Set page configuration
+st.set_page_config(
+    page_title="DBSCAN Customer Segmentation",
+    page_icon="👥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Enhanced Custom CSS
+st.markdown("""
+    <style>
+        .main-header {
+            text-align: center;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .cluster-card {
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .cluster-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .metric-container p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+class DBSCANCustomerSegmentation:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
         # Load the dataset
         self.df = pd.read_csv(csv_path)
         
-        # Predefined cluster characteristics
+        # Predefined cluster descriptions
         self.cluster_descriptions = {
             0: {
                 'name': '🏦 Conservative Spenders',
@@ -42,10 +83,51 @@ class CustomerSegmentationAnalysis:
                 'icon': '🌟'
             }
         }
-
+        
+        # Prepare data for clustering
+        self.prepare_data()
+    
+    def prepare_data(self):
+        # Select features for clustering
+        features = ['Income (INR)', 'Spending (1-100)']
+        
+        # Scale the features
+        self.scaler = StandardScaler()
+        scaled_features = self.scaler.fit_transform(self.df[features])
+        
+        # Perform DBSCAN clustering
+        dbscan = DBSCAN(eps=0.5, min_samples=5)
+        self.df['Cluster'] = dbscan.fit_predict(scaled_features)
+        
+        # Optional: Compute cluster centroids
+        self.compute_cluster_centroids(scaled_features)
+    
+    def compute_cluster_centroids(self, scaled_features):
+        # Compute cluster centroids
+        self.cluster_centroids = {}
+        for cluster in self.df['Cluster'].unique():
+            mask = self.df['Cluster'] == cluster
+            cluster_points = scaled_features[mask]
+            centroid = cluster_points.mean(axis=0)
+            self.cluster_centroids[cluster] = centroid
+    
+    def predict_customer_cluster(self, income, spending):
+        # Scale the input
+        input_data = self.scaler.transform([[income, spending]])
+        
+        # Compute distances to cluster centroids
+        distances = {}
+        for cluster, centroid in self.cluster_centroids.items():
+            distance = np.linalg.norm(input_data - centroid)
+            distances[cluster] = distance
+        
+        # Find the nearest cluster
+        predicted_cluster = min(distances, key=distances.get)
+        return predicted_cluster
+    
     def analyze_customer_profile(self, customer_id, gender, age, income, spending):
-        # Simulate cluster assignment and analysis
-        cluster = self._predict_cluster(income, spending)
+        # Predict cluster
+        cluster = self.predict_customer_cluster(income, spending)
         
         return {
             'customer_id': customer_id,
@@ -55,22 +137,9 @@ class CustomerSegmentationAnalysis:
             'spending_potential': self._calculate_spending_potential(cluster, income, spending),
             'personalized_insights': self._generate_personalized_insights(cluster, gender, age)
         }
-
-    def _predict_cluster(self, income, spending):
-        # Simple clustering logic based on income and spending
-        if income > 80000 and spending < 30:
-            return 3  # Risk Group
-        elif income > 80000 and spending > 70:
-            return 2  # Premium Customers
-        elif income > 40000 and 30 <= spending <= 70:
-            return 1  # Balanced Customers
-        elif income <= 40000:
-            return 0  # Conservative Spenders
-        else:
-            return -1  # Outliers
-
+    
     def _calculate_risk_score(self, cluster, income, spending, age):
-        # Generate a risk score based on multiple factors
+        # Calculate risk based on cluster and other factors
         base_risk = {
             0: 30,   # Conservative Spenders
             1: 50,   # Balanced Customers
@@ -79,13 +148,13 @@ class CustomerSegmentationAnalysis:
             -1: 70   # Outliers
         }
         
-        risk_modifier = (age / 100) * 20  # Age impacts risk
-        spending_variance = abs(spending - 50)  # Distance from average spending
+        risk_modifier = (age / 100) * 20
+        spending_variance = abs(spending - 50)
         
         return min(base_risk.get(cluster, 50) + risk_modifier + (spending_variance / 2), 100)
-
+    
     def _calculate_spending_potential(self, cluster, income, spending):
-        # Estimate future spending potential
+        # Estimate spending potential
         potential_map = {
             0: 0.4,  # Conservative
             1: 0.6,  # Balanced
@@ -95,10 +164,10 @@ class CustomerSegmentationAnalysis:
         }
         
         base_potential = potential_map.get(cluster, 0.5)
-        income_factor = min(income / 100000, 1)  # Normalize income
+        income_factor = min(income / 100000, 1)
         
         return min(base_potential * income_factor * 100, 100)
-
+    
     def _generate_personalized_insights(self, cluster, gender, age):
         # Generate personalized marketing insights
         age_groups = {
@@ -122,126 +191,121 @@ class CustomerSegmentationAnalysis:
         }
         
         return insights.get(cluster, "Unique Customer Profile")
+    
+    def create_visualizations(self):
+        # Cluster Distribution
+        plt.figure(figsize=(10, 6))
+        cluster_counts = self.df['Cluster'].value_counts()
+        cluster_counts.plot(kind='bar')
+        plt.title('Customer Cluster Distribution')
+        plt.xlabel('Cluster')
+        plt.ylabel('Number of Customers')
+        cluster_dist_fig = plt.gcf()
+        plt.close()
+        
+        # Income vs Spending Scatter
+        plt.figure(figsize=(10, 6))
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]
+            plt.scatter(cluster_data['Income (INR)'], cluster_data['Spending (1-100)'], 
+                        label=f'Cluster {cluster}', alpha=0.7)
+        plt.title('Income vs Spending by Cluster')
+        plt.xlabel('Income (INR)')
+        plt.ylabel('Spending Score')
+        plt.legend()
+        income_spending_fig = plt.gcf()
+        plt.close()
+        
+        return {
+            'cluster_distribution': cluster_dist_fig,
+            'income_vs_spending': income_spending_fig
+        }
 
 def main():
-    # Page configuration
-    st.set_page_config(
-        page_title="Customer Segmentation System", 
-        page_icon="📊", 
-        layout="wide"
-    )
-
-    # Custom CSS
-    st.markdown("""
-    <style>
-        .main-container {
-            background-color: #f4f6f9;
-            padding: 20px;
-            border-radius: 15px;
-        }
-        .analysis-card {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .cluster-badge {
-            display: inline-block;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .stTabs [data-baseweb="tab"] {
-            background-color: #e9ecef;
-            border-radius: 10px;
-            margin: 5px;
-            padding: 10px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
     # Main title
-    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>📊 Customer Segmentation System</h1>", unsafe_allow_html=True)
-
-    # Initialize analysis model
-    model = CustomerSegmentationAnalysis()
-
-    # Tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    st.markdown('<div class="main-header"><h1>DBSCAN Customer Segmentation</h1></div>', unsafe_allow_html=True)
+    
+    # Initialize model
+    model = DBSCANCustomerSegmentation()
+    
+    # Tab navigation
+    tab1, tab2, tab3, tab4 = st.tabs([
         "🔍 Customer Analysis", 
-        "📊 Data Overview", 
+        "📊 Cluster Overview", 
         "📈 Visualizations", 
-        "📋 Full Dataset", 
-        "📊 Cluster Overview"
+        "📋 Full Dataset"
     ])
-
+    
     with tab1:
-        st.markdown("### 📋 Customer Profile Input")
+        # Customer input sidebar
+        with st.sidebar:
+            st.markdown("### 📊 Customer Profile Analysis")
+            st.markdown("---")
+            
+            customer_id = st.text_input("📋 Customer ID")
+            gender = st.selectbox("👤 Gender", options=["Male", "Female", "Other"])
+            age = st.number_input("🎂 Age", min_value=0, max_value=100, value=30)
+            income = st.number_input("💵 Income (INR)", min_value=0, value=50000)
+            spending = st.number_input("🛍️ Spending (1-100)", min_value=0, max_value=100, value=50)
+            
+            if st.button("Analyze Customer"):
+                analysis_result = model.analyze_customer_profile(customer_id, gender, age, income, spending)
+                
+                st.markdown(f"""
+                    <div class="cluster-card">
+                        <span class="cluster-badge" style="background-color: {analysis_result['cluster_details']['color']};">
+                            {analysis_result['cluster_details']['icon']} Cluster {analysis_result['cluster']}
+                        </span>
+                        <h4>{analysis_result['cluster_details']['name']}</h4>
+                        <p>{analysis_result['cluster_details']['description']}</p>
+                        <hr>
+                        <div class="metric-container">
+                            <p>📊 Risk Score: {analysis_result['risk_score']:.2f}/100</p>
+                            <p>💸 Spending Potential: {analysis_result['spending_potential']:.2f}/100</p>
+                            <p>🎯 Insight: {analysis_result['personalized_insights']}</p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        # Cluster Overview
+        st.markdown("### 📊 Cluster Insights")
+        for cluster, details in model.cluster_descriptions.items():
+            if cluster != -1:
+                with st.expander(f"Cluster {cluster} | {details['name']}"):
+                    cluster_data = model.df[model.df['Cluster'] == cluster]
+                    st.markdown(f"""
+                        <div class="cluster-card">
+                            <p>{details['description']}</p>
+                            <p>👥 Cluster Size: {len(cluster_data)} customers</p>
+                            <p>💰 Average Income: ₹{cluster_data['Income (INR)'].mean():,.2f}</p>
+                            <p>🛍️ Average Spending: {cluster_data['Spending (1-100)'].mean():.2f}/100</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+    
+    with tab2:
+        st.markdown("### 📊 Comprehensive Cluster Breakdown")
+        
+        # Cluster Statistics
+        cluster_stats = model.df.groupby('Cluster')[['Income (INR)', 'Spending (1-100)']].agg(['count', 'mean', 'median'])
+        st.dataframe(cluster_stats)
+    
+    with tab3:
+        st.markdown("### 📈 Visualizations")
+        
+        # Generate and display visualizations
+        visualizations = model.create_visualizations()
         
         col1, col2 = st.columns(2)
         
         with col1:
-            customer_id = st.text_input("📋 Customer ID", value=f"CUS-{random.randint(1000, 9999)}")
-            gender = st.selectbox("👤 Gender", ["Male", "Female", "Other"])
+            st.pyplot(visualizations['cluster_distribution'])
         
         with col2:
-            age = st.slider("🎂 Age", 18, 100, 35)
-            income = st.number_input("💵 Income (INR)", min_value=1000, max_value=1000000, value=50000, step=1000)
-        
-        spending = st.slider("🛍️ Spending Score (1-100)", 1, 100, 50)
-        
-        if st.button("🔍 Analyze Customer"):
-            # Perform analysis
-            analysis_result = model.analyze_customer_profile(customer_id, gender, age, income, spending)
-            
-            # Display results
-            st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
-            
-            # Cluster Badge
-            st.markdown(f"""
-            <div class="cluster-badge" style="background-color: {analysis_result['cluster_details']['color']}; color: white;">
-                {analysis_result['cluster_details']['icon']} {analysis_result['cluster_details']['name']}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Detailed Analysis
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.metric("Customer ID", analysis_result['customer_id'])
-                st.metric("Cluster", analysis_result['cluster_details']['name'])
-                st.metric("Cluster Description", analysis_result['cluster_details']['description'])
-            
-            with col2:
-                st.metric("Risk Score", f"{analysis_result['risk_score']:.2f}/100")
-                st.metric("Spending Potential", f"{analysis_result['spending_potential']:.2f}/100")
-                st.metric("Personalized Insight", analysis_result['personalized_insights'])
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # Placeholder tabs for future implementation
-    with tab2:
-        st.markdown("### 📊 Data Overview")
-        st.dataframe(model.df.describe())
-
-    with tab3:
-        st.markdown("### 📈 Visualizations")
-        # Add visualization logic here
-
+            st.pyplot(visualizations['income_vs_spending'])
+    
     with tab4:
         st.markdown("### 📋 Full Dataset")
         st.dataframe(model.df)
-
-    with tab5:
-        st.markdown("### 📊 Cluster Overview")
-        for cluster, details in model.cluster_descriptions.items():
-            if cluster != -1:
-                st.markdown(f"""
-                ### {details['icon']} {details['name']}
-                **Description:** {details['description']}
-                """)
 
 if __name__ == '__main__':
     main()
