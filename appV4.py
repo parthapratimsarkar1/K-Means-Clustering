@@ -2,23 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
 import warnings
+import os
 
-# Suppress warnings
+# Ignore warnings
 warnings.filterwarnings('ignore')
 
-# Set page configuration
-st.set_page_config(
-    page_title="DBSCAN Customer Segmentation",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Custom CSS
+# Enhanced Custom CSS
 st.markdown("""
     <style>
         .main-header {
@@ -43,95 +35,119 @@ st.markdown("""
             border-radius: 5px;
             font-weight: bold;
         }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            background-color: #f0f2f6;
+            color: #333;
+            font-weight: bold;
+            border-radius: 10px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 class DBSCANCustomerSegmentation:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
         try:
-            # Load the dataset
-            self.df = pd.read_csv(csv_path)
-            
+            # Load the dataset with error handling
+            if not os.path.exists(csv_path):
+                st.error(f"Error: File {csv_path} not found.")
+                raise FileNotFoundError(f"Could not find {csv_path}")
+
+            # Try multiple encodings
+            encodings = ['utf-8', 'latin-1', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    self.df = pd.read_csv(csv_path, encoding=encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                st.error("Could not read the CSV file with any standard encoding")
+                raise
+
             # Validate required columns
-            required_columns = ['Income (INR)', 'Spending  (1-100)']
+            required_columns = ['Income (INR)', 'Spending  (1-100)', 'Age', 'Gender']
             missing_columns = [col for col in required_columns if col not in self.df.columns]
             
             if missing_columns:
                 st.error(f"Missing columns: {missing_columns}")
-                st.error(f"Columns in dataset: {list(self.df.columns)}")
                 raise ValueError(f"Missing required columns: {missing_columns}")
-            
-            # Prepare data for clustering
-            self.prepare_data()
-            
-            # Perform clustering
+
+            # Perform DBSCAN clustering
             self.perform_clustering()
-            
-            # Analyze clusters
-            self.analyze_clusters()
-        
+
         except Exception as e:
             st.error(f"An error occurred while loading the data: {e}")
             raise
-    
-    def prepare_data(self):
-        # Select features for clustering
-        self.features = ['Income (INR)', 'Spending  (1-100)']
-        
-        # Remove any rows with missing values
-        self.X = self.df[self.features].dropna()
-        
-        # Scale the features
-        self.scaler = StandardScaler()
-        self.X_scaled = self.scaler.fit_transform(self.X)
-    
+
     def perform_clustering(self):
+        # Select features for clustering
+        features = ['Income (INR)', 'Spending  (1-100)']
+        X = self.df[features].dropna()
+
+        # Standardize the features
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
         # Perform DBSCAN clustering
-        self.dbscan = DBSCAN(eps=0.5, min_samples=10)
-        self.labels = self.dbscan.fit_predict(self.X_scaled)
+        db = DBSCAN(eps=0.5, min_samples=10).fit(X_scaled)
+        self.df.loc[X.index, 'Cluster'] = db.labels_
+
+        # Fill NaN clusters with a separate label
+        self.df['Cluster'] = self.df['Cluster'].fillna(-2)
         
-        # Add cluster labels to the dataframe
-        self.X['Cluster'] = self.labels
-    
-    def analyze_clusters(self):
         # Analyze cluster characteristics
-        self.cluster_summary = self.X.groupby('Cluster').agg(
-            Count=('Cluster', 'size'),
-            Mean_Income=('Income (INR)', 'mean'),
-            Median_Income=('Income (INR)', 'median'),
-            Mean_Spending=('Spending  (1-100)', 'mean'),
-            Median_Spending=('Spending  (1-100)', 'median')
-        )
+        self.analyze_clusters()
+
+    def analyze_clusters(self):
+        # Group by clusters and compute statistics
+        self.cluster_summary = self.df[self.df['Cluster'] != -2].groupby('Cluster').agg({
+            'Cluster': 'size',
+            'Income (INR)': ['mean', 'median'],
+            'Spending  (1-100)': ['mean', 'median'],
+            'Age': ['mean', 'min', 'max'],
+            'Gender': lambda x: x.value_counts().to_dict()
+        })
         
-        # Create cluster descriptions matching the exact clusters in your data
+        # Rename columns for clarity
+        self.cluster_summary.columns = [
+            'Count', 
+            'Mean_Income', 'Median_Income', 
+            'Mean_Spending', 'Median_Spending',
+            'Mean_Age', 'Min_Age', 'Max_Age', 
+            'Gender_Distribution'
+        ]
+
+        # Add cluster descriptions
         self.cluster_descriptions = {
-            -1: "🔍 Noise Points (Outliers)",
-            0: "💼 Standard Customers",
-            1: "💰 Low Spending Group",
-            2: "🌟 High Spending Group",
-            3: "🔒 Constrained Spending Group"
+            -1: "🚨 Noise Points (Outliers)",
+            0: "💼 Mainstream Customers",
+            1: "📉 Low Spending Segment",
+            2: "💎 High Spending Premium Segment"
         }
-    
+
     def create_visualizations(self):
-        # Create scatter plot of clusters
         plt.figure(figsize=(12, 8))
         
-        # Plot noise points (Cluster -1) separately
-        noise_data = self.X[self.X['Cluster'] == -1]
-        plt.scatter(noise_data['Income (INR)'], 
-                    noise_data['Spending  (1-100)'], 
-                    color='red', label='Noise Points', marker='x')
+        # Color map for clusters
+        colors = ['gray', 'blue', 'green', 'red', 'purple', 'orange']
         
-        # Plot other clusters
-        for cluster_label in sorted(self.X['Cluster'].unique()):
-            if cluster_label == -1:
-                continue
-            cluster_data = self.X[self.X['Cluster'] == cluster_label]
-            plt.scatter(cluster_data['Income (INR)'], 
-                        cluster_data['Spending  (1-100)'], 
-                        label=f'Cluster {cluster_label}')
+        # Scatter plot of Income vs Spending by Cluster
+        for i, cluster in enumerate(sorted(self.df['Cluster'].unique())):
+            if cluster != -2:  # Exclude rows without cluster assignment
+                cluster_data = self.df[self.df['Cluster'] == cluster]
+                plt.scatter(
+                    cluster_data['Income (INR)'], 
+                    cluster_data['Spending  (1-100)'], 
+                    label=f'Cluster {cluster}: {self.cluster_descriptions.get(cluster, "Undefined")}',
+                    color=colors[i % len(colors)],
+                    alpha=0.7
+                )
         
-        plt.title('DBSCAN Clustering: Income vs Spending Score')
+        plt.title('DBSCAN Clustering: Income vs Spending')
         plt.xlabel('Income (INR)')
         plt.ylabel('Spending Score')
         plt.legend()
@@ -140,102 +156,74 @@ class DBSCANCustomerSegmentation:
         return plt
 
 def main():
+    # Set page title and icon
+    st.set_page_config(page_title="DBSCAN Customer Segmentation", page_icon="📊")
+    
     # Header
     st.markdown('<div class="main-header"><h1>DBSCAN Customer Segmentation</h1></div>', unsafe_allow_html=True)
     
     try:
-        # Initialize the segmentation model
+        # Initialize the model
         model = DBSCANCustomerSegmentation()
     except Exception as e:
         st.error("Failed to initialize the model. Please check your dataset.")
         return
     
     # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Cluster Overview", "📈 Visualizations", "🔍 Detailed Analysis", "📋 Full Dataset"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔍 Cluster Analysis", "📊 Cluster Overview", "📈 Visualizations", "📋 Full Dataset"])
     
     with tab1:
-        st.markdown("### 📊 Cluster Composition")
+        # Sidebar for parameter tuning
+        with st.sidebar:
+            st.markdown("### 🛠️ DBSCAN Parameters")
+            eps = st.slider("Epsilon (neighborhood distance)", 0.1, 2.0, 0.5)
+            min_samples = st.slider("Minimum Samples", 5, 20, 10)
+            
+            if st.button("Re-run Clustering"):
+                # Perform clustering with new parameters
+                try:
+                    features = ['Income (INR)', 'Spending  (1-100)']
+                    X = model.df[features].dropna()
+                    scaler = StandardScaler()
+                    X_scaled = scaler.fit_transform(X)
+                    
+                    db = DBSCAN(eps=eps, min_samples=min_samples).fit(X_scaled)
+                    model.df.loc[X.index, 'Cluster'] = db.labels_
+                    model.df['Cluster'] = model.df['Cluster'].fillna(-2)
+                    
+                    model.analyze_clusters()
+                    st.success("Clustering re-run successfully!")
+                except Exception as e:
+                    st.error(f"Error in re-clustering: {e}")
         
-        # Display cluster summary
-        st.dataframe(model.cluster_summary)
-        
-        # Detailed cluster description
-        st.markdown("### 🏷️ Cluster Descriptions")
+        # Cluster Details
+        st.markdown("### 📊 Cluster Characteristics")
         for cluster, description in model.cluster_descriptions.items():
-            with st.expander(f"Cluster {cluster} | {description}"):
-                if cluster in model.cluster_summary.index:
-                    cluster_info = model.cluster_summary.loc[cluster]
+            if cluster in model.cluster_summary.index:
+                cluster_info = model.cluster_summary.loc[cluster]
+                with st.expander(f"Cluster {cluster} | {description}"):
                     st.markdown(f"""
                         <div class="cluster-card">
-                            <p>👥 Number of Customers: {cluster_info['Count']}</p>
-                            <p>💰 Average Income: ₹{cluster_info['Mean_Income']:,.2f}</p>
-                            <p>🛍️ Average Spending Score: {cluster_info['Mean_Spending']:.2f}</p>
+                            <p>👥 Count: {cluster_info['Count']} customers</p>
+                            <p>💰 Mean Income: ₹{cluster_info['Mean_Income']:,.2f}</p>
+                            <p>🛍️ Mean Spending Score: {cluster_info['Mean_Spending']:.2f}</p>
+                            <p>📅 Age Range: {cluster_info['Min_Age']:.0f} - {cluster_info['Max_Age']:.0f} years</p>
+                            <p>👤 Gender Distribution: {cluster_info['Gender_Distribution']}</p>
                         </div>
                     """, unsafe_allow_html=True)
-                else:
-                    st.write("No data for this cluster")
     
     with tab2:
-        st.markdown("### 📈 Cluster Visualization")
-        
-        # Create and display the visualization
-        visualization = model.create_visualizations()
-        st.pyplot(visualization)
-        
-        # Additional insights
-        st.markdown("### 🔍 Clustering Insights")
-        st.write("Red 'x' points represent noise points or outliers detected by DBSCAN.")
+        st.markdown("### 📊 Detailed Cluster Summary")
+        st.dataframe(model.cluster_summary)
     
     with tab3:
-        st.markdown("### 🔬 Detailed Cluster Analysis")
-        
-        # Select cluster for detailed view
-        selected_cluster = st.selectbox("Select Cluster", 
-                                        sorted(model.X['Cluster'].unique()))
-        
-        # Filter data for selected cluster
-        cluster_data = model.X[model.X['Cluster'] == selected_cluster]
-        
-        # Display detailed statistics
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 📊 Descriptive Statistics")
-            st.dataframe(cluster_data.describe())
-        
-        with col2:
-            st.markdown("#### 📈 Distribution")
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-            
-            # Income distribution
-            sns.histplot(cluster_data['Income (INR)'], kde=True, ax=ax1)
-            ax1.set_title(f'Income Distribution - Cluster {selected_cluster}')
-            
-            # Spending distribution
-            sns.histplot(cluster_data['Spending  (1-100)'], kde=True, ax=ax2)
-            ax2.set_title(f'Spending Distribution - Cluster {selected_cluster}')
-            
-            st.pyplot(fig)
+        st.markdown("### 📈 Cluster Visualization")
+        visualization = model.create_visualizations()
+        st.pyplot(visualization)
     
     with tab4:
         st.markdown("### 📋 Full Dataset")
-        
-        # Display full dataset with styling
-        st.dataframe(
-            model.X.style.background_gradient(subset=['Income (INR)', 'Spending  (1-100)'])
-        )
-        
-        # Additional dataset information
-        st.markdown("#### 📊 Dataset Summary")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Total Records", len(model.X))
-            st.metric("Unique Clusters", len(model.X['Cluster'].unique()))
-        
-        with col2:
-            st.metric("Avg Income", f"₹{model.X['Income (INR)'].mean():,.2f}")
-            st.metric("Avg Spending Score", f"{model.X['Spending  (1-100)'].mean():.2f}")
+        st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending  (1-100)']))
 
 if __name__ == '__main__':
     main()
