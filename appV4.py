@@ -75,7 +75,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class CustomerSegmentation:
-    def __init__(self, csv_path='Customer-Dataset-With-Clustered.csv'):
+    def __init__(self, csv_path='/Customer-Dataset-With-ClusteredDB.csv'):
         try:
             # Add error handling for file loading
             if not os.path.exists(csv_path):
