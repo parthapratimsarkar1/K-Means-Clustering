@@ -1,165 +1,194 @@
-import numpy as np
+import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
-class CustomerSegmentation:
+# Set page configuration
+st.set_page_config(
+    page_title="DBSCAN Customer Segmentation",
+    page_icon="👥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Enhanced Custom CSS
+st.markdown("""
+    <style>
+        .main-header {
+            text-align: center;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .cluster-card {
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .cluster-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .metric-container p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+class DBSCANCustomerSegmentation:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
-        """
-        Initialize the customer segmentation analysis
-        
-        Args:
-            csv_path (str): Path to the customer dataset
-        """
         # Load the dataset
-        try:
-            self.data = pd.read_csv(csv_path)
-        except FileNotFoundError:
-            print(f"Error: File {csv_path} not found.")
-            return
-        
+        self.df = pd.read_csv(csv_path)
+
         # Predefined cluster descriptions
         self.cluster_descriptions = {
-            -1: {
-                'name': 'Outliers',
-                'description': 'Unique Customer Profiles',
-                'color': '#FFA500'
-            },
             0: {
-                'name': 'Moderate Customers',
-                'description': 'Average Income and Spending',
-                'color': '#3498db'
+                'name': 'Conservative Spenders',
+                'description': 'High Income, Moderate Spending',
+                'color': '#3498db',
+                'icon': '💰'
             },
             1: {
-                'name': 'Low Spending Customers',
-                'description': 'Low Income, Conservative Spending',
-                'color': '#95a5a6'
+                'name': 'Balanced Customers',
+                'description': 'Moderate Income, Balanced Spending',
+                'color': '#2ecc71',
+                'icon': '⚖️'
             },
             2: {
-                'name': 'High Spending Customers',
+                'name': 'Premium Customers',
                 'description': 'High Income, High Spending',
-                'color': '#2ecc71'
+                'color': '#9b59b6',
+                'icon': '💎'
             },
             3: {
-                'name': 'High Income, Low Spending',
-                'description': 'High Potential Customers',
-                'color': '#e74c3c'
+                'name': 'Risk Group',
+                'description': 'High Income, Low Spending',
+                'color': '#e74c3c',
+                'icon': '⚠️'
+            },
+            -1: {
+                'name': 'Unique Outliers',
+                'description': 'Non-Standard Customer Profile',
+                'color': '#f39c12',
+                'icon': '🌟'
             }
         }
-        
-        # Prepare and cluster data
+
+        # Prepare data for clustering
         self.prepare_data()
-    
+
     def prepare_data(self):
-        """
-        Prepare data for clustering by selecting and scaling features
-        """
-        # Select relevant features (correcting potential column name issues)
-        features = ['Income (INR)', 'Spending  (1-100)']
-        
-        # Drop rows with missing values
-        X = self.data[features].dropna()
-        
-        # Standardize the features
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
+        # Select features for clustering
+        features = ['Income (INR)', 'Spending (1-100)']
+
+        # Scale the features
+        self.scaler = StandardScaler()
+        scaled_features = self.scaler.fit_transform(self.df[features])
+
         # Perform DBSCAN clustering
-        db = DBSCAN(eps=0.5, min_samples=10)
-        labels = db.fit_predict(X_scaled)
-        
-        # Add cluster labels to the dataset
-        X['Cluster'] = labels
-        self.clustered_data = X
-    
-    def analyze_clusters(self):
-        """
-        Analyze and print cluster characteristics
-        
-        Returns:
-            pd.DataFrame: Cluster summary statistics
-        """
-        cluster_summary = self.clustered_data.groupby('Cluster').agg(
-            Count=('Cluster', 'size'),
-            Mean_Income=('Income (INR)', 'mean'),
-            Median_Income=('Income (INR)', 'median'),
-            Mean_Spending=('Spending  (1-100)', 'mean'),
-            Median_Spending=('Spending  (1-100)', 'median')
-        )
-        
-        print("Cluster Characteristics Summary:\n")
-        print(cluster_summary)
-        return cluster_summary
-    
-    def visualize_clusters(self):
-        """
-        Create visualizations of the clusters
-        """
-        plt.figure(figsize=(12, 8))
-        
-        # Scatter plot of clusters
-        for cluster_label in sorted(self.clustered_data['Cluster'].unique()):
-            cluster_data = self.clustered_data[self.clustered_data['Cluster'] == cluster_label]
-            plt.scatter(
-                cluster_data['Income (INR)'], 
-                cluster_data['Spending  (1-100)'], 
-                label=f'Cluster {cluster_label}: {self.cluster_descriptions[cluster_label]["name"]}',
-                color=self.cluster_descriptions[cluster_label]['color'],
-                alpha=0.7
-            )
-        
-        plt.title('Customer Segmentation: Income vs Spending', fontsize=15)
-        plt.xlabel('Income (INR)', fontsize=12)
-        plt.ylabel('Spending Score (1-100)', fontsize=12)
+        dbscan = DBSCAN(eps=0.5, min_samples=5)
+        self.df['Cluster'] = dbscan.fit_predict(scaled_features)
+
+        # Compute cluster centroids
+        self.compute_cluster_centroids(scaled_features)
+
+    def compute_cluster_centroids(self, scaled_features):
+        self.cluster_centroids = {}
+        for cluster in self.df['Cluster'].unique():
+            cluster_points = scaled_features[self.df['Cluster'] == cluster]
+            centroid = cluster_points.mean(axis=0)
+            self.cluster_centroids[cluster] = centroid
+
+    def predict_customer_cluster(self, income, spending):
+        input_data = self.scaler.transform([[income, spending]])
+        distances = {}
+        for cluster, centroid in self.cluster_centroids.items():
+            distance = np.linalg.norm(input_data - centroid)
+            distances[cluster] = distance
+        predicted_cluster = min(distances, key=distances.get)
+        return predicted_cluster
+
+    def analyze_customer_profile(self, customer_id, gender, age, income, spending):
+        cluster = self.predict_customer_cluster(income, spending)
+        return {
+            'customer_id': customer_id,
+            'cluster': cluster,
+            'cluster_details': self.cluster_descriptions[cluster],
+            'risk_score': self._calculate_risk_score(cluster, income, spending, age),
+            'spending_potential': self._calculate_spending_potential(cluster, income, spending),
+            'personalized_insights': self._generate_personalized_insights(cluster, gender, age)
+        }
+
+    def _calculate_risk_score(self, cluster, income, spending, age):
+        # Implement a more sophisticated risk scoring model
+        # Consider factors like age, income, spending, and cluster-specific risks
+        pass
+
+    def _calculate_spending_potential(self, cluster, income, spending):
+        # Implement a more accurate spending potential estimation model
+        # Consider factors like income, spending habits, and cluster-specific potential
+        pass
+
+    def _generate_personalized_insights(self, cluster, gender, age):
+        # Implement a more advanced personalization engine
+        # Consider using NLP techniques to generate tailored insights
+        pass
+
+    def create_visualizations(self):
+        # Cluster Distribution
+        plt.figure(figsize=(10, 6))
+        cluster_counts = self.df['Cluster'].value_counts()
+        cluster_counts.plot(kind='bar')
+        plt.title('Customer Cluster Distribution')
+        plt.xlabel('Cluster')
+        plt.ylabel('Number of Customers')
+        cluster_dist_fig = plt.gcf()
+        plt.close()
+
+        # Income vs Spending Scatter
+        plt.figure(figsize=(10, 6))
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]
+            plt.scatter(cluster_data['Income (INR)'], cluster_data['Spending (1-100)'],
+                        label=f'Cluster {cluster}', alpha=0.7)
+        plt.title('Income vs Spending by Cluster')
+        plt.xlabel('Income (INR)')
+        plt.ylabel('Spending Score')
         plt.legend()
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        plt.show()
-    
-    def detailed_cluster_analysis(self):
-        """
-        Provide detailed insights for each cluster
-        """
-        for cluster, details in self.cluster_descriptions.items():
-            if cluster in self.clustered_data['Cluster'].unique():
-                cluster_data = self.clustered_data[self.clustered_data['Cluster'] == cluster]
-                
-                print(f"\n--- Cluster {cluster}: {details['name']} ---")
-                print(f"Description: {details['description']}")
-                print(f"Number of Customers: {len(cluster_data)}")
-                print(f"Average Income: ₹{cluster_data['Income (INR)'].mean():,.2f}")
-                print(f"Average Spending Score: {cluster_data['Spending  (1-100)'].mean():.2f}")
-    
-    def export_cluster_data(self, output_path='clustered_customers.csv'):
-        """
-        Export clustered data to a CSV file
-        
-        Args:
-            output_path (str): Path to save the clustered data
-        """
-        # Merge original data with cluster labels
-        export_data = self.data.copy()
-        export_data['Cluster'] = self.clustered_data['Cluster']
-        export_data.to_csv(output_path, index=False)
-        print(f"Clustered data exported to {output_path}")
+        income_spending_fig = plt.gcf()
+        plt.close()
+
+        return {
+            'cluster_distribution': cluster_dist_fig,
+            'income_vs_spending': income_spending_fig
+        }
 
 def main():
-    # Initialize the customer segmentation analysis
-    segmentation = CustomerSegmentation()
-    
-    # Analyze clusters
-    segmentation.analyze_clusters()
-    
-    # Visualize clusters
-    segmentation.visualize_clusters()
-    
-    # Detailed cluster analysis
-    segmentation.detailed_cluster_analysis()
-    
-    # Export clustered data
-    segmentation.export_cluster_data()
+    # Main title
+    st.markdown('<div class="main-header"><h1>DBSCAN Customer Segmentation</h1></div>', unsafe_allow_html=True)
 
-if __name__ == "__main__":
+    # Initialize model
+    model = DBSCANCustomerSegmentation()
+
+    # Tab navigation
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🔍 Customer Analysis",
+        "📊 Cluster Overview",
+        "📈 Visualizations",
+        "📋 Full Dataset"
+    ])
+
+    # ... (rest of the code)
+
+if __name__ == '__main__':
     main()
