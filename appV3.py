@@ -1,11 +1,19 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objs as go
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import warnings
 import os
+
+# Try to import Plotly, but prepare for fallback
+try:
+    import plotly.express as px
+    import plotly.graph_objs as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    st.warning("Plotly not installed. Using Matplotlib for visualizations.")
 
 warnings.filterwarnings('ignore')
 
@@ -171,71 +179,61 @@ class CustomerSegmentation:
         return predicted_cluster, self.cluster_info[predicted_cluster]
 
     def create_visualizations(self):
-        # Create various interactive visualizations
+        # Fallback to Matplotlib if Plotly is not available
         visualizations = {}
 
-        # 1. Cluster Distribution Pie Chart
-        cluster_sizes = self.df['Cluster'].value_counts()
-        visualizations['cluster_distribution'] = px.pie(
-            values=cluster_sizes.values, 
-            names=cluster_sizes.index.map(lambda x: f"Cluster {x}"),
-            title="Customer Cluster Distribution",
-            hole=0.3
-        )
-
-        # 2. Income vs Spending Scatter Plot
-        visualizations['income_vs_spending'] = px.scatter(
-            self.df, 
-            x='Income (INR)', 
-            y='Spending (1-100)', 
-            color='Cluster',
-            title='Income vs Spending by Cluster',
-            labels={'Income (INR)': 'Income (INR)', 'Spending (1-100)': 'Spending Score'},
-            color_discrete_sequence=px.colors.qualitative.Pastel
-        )
-
-        # 3. Age Distribution Box Plot
-        visualizations['age_distribution'] = px.box(
-            self.df, 
-            x='Cluster', 
-            y='Age',
-            title='Age Distribution Across Clusters',
-            color='Cluster',
-            color_discrete_sequence=px.colors.qualitative.Pastel
-        )
-
-        # 4. Gender Distribution Stacked Bar
-        gender_cluster = self.df.groupby(['Cluster', 'Gender']).size().unstack(fill_value=0)
-        gender_cluster_percent = gender_cluster.apply(lambda x: x / x.sum() * 100, axis=1)
-        
-        visualizations['gender_distribution'] = px.bar(
-            x=gender_cluster_percent.index.map(lambda x: f"Cluster {x}"),
-            y=gender_cluster_percent['Male'],
-            title='Gender Distribution by Cluster',
-            labels={'x': 'Cluster', 'y': 'Percentage of Males'},
-            color_discrete_sequence=['#636EFA']
-        )
-        visualizations['gender_distribution'].add_trace(
-            go.Bar(
-                x=gender_cluster_percent.index.map(lambda x: f"Cluster {x}"),
-                y=gender_cluster_percent['Female'],
-                name='Female',
-                base=gender_cluster_percent['Male'],
-                marker_color='#EF553B'
+        if PLOTLY_AVAILABLE:
+            # Plotly visualizations
+            # 1. Cluster Distribution Pie Chart
+            cluster_sizes = self.df['Cluster'].value_counts()
+            visualizations['cluster_distribution'] = px.pie(
+                values=cluster_sizes.values, 
+                names=cluster_sizes.index.map(lambda x: f"Cluster {x}"),
+                title="Customer Cluster Distribution",
+                hole=0.3
             )
-        )
-        visualizations['gender_distribution'].update_layout(barmode='stack')
 
-        # 5. Correlation Heatmap
-        corr_columns = ['Age', 'Income (INR)', 'Spending (1-100)', 'Gender_Encoded']
-        correlation_matrix = self.df[corr_columns].corr()
-        
-        visualizations['correlation_heatmap'] = px.imshow(
-            correlation_matrix, 
-            text_auto=True, 
-            aspect='auto', 
-            title='Feature Correlation Heatmap'
-        )
+            # 2. Income vs Spending Scatter Plot
+            visualizations['income_vs_spending'] = px.scatter(
+                self.df, 
+                x='Income (INR)', 
+                y='Spending (1-100)', 
+                color='Cluster',
+                title='Income vs Spending by Cluster',
+                labels={'Income (INR)': 'Income (INR)', 'Spending (1-100)': 'Spending Score'},
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+        else:
+            # Matplotlib fallback visualizations
+            # 1. Cluster Distribution Pie Chart
+            plt.figure(figsize=(10, 6))
+            cluster_sizes = self.df['Cluster'].value_counts()
+            plt.pie(cluster_sizes.values, labels=[f"Cluster {x}" for x in cluster_sizes.index], autopct='%1.1f%%')
+            plt.title("Customer Cluster Distribution")
+            visualizations['cluster_distribution'] = plt
+
+            # 2. Income vs Spending Scatter Plot
+            plt.figure(figsize=(10, 6))
+            for cluster in self.df['Cluster'].unique():
+                cluster_data = self.df[self.df['Cluster'] == cluster]
+                plt.scatter(cluster_data['Income (INR)'], cluster_data['Spending (1-100)'], 
+                            label=f'Cluster {cluster}')
+            plt.xlabel('Income (INR)')
+            plt.ylabel('Spending Score')
+            plt.title('Income vs Spending by Cluster')
+            plt.legend()
+            visualizations['income_vs_spending'] = plt
+
+        # 3. Age Distribution (works with both Plotly and Matplotlib)
+        plt.figure(figsize=(10, 6))
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]['Age']
+            plt.hist(cluster_data, alpha=0.5, label=f'Cluster {cluster}')
+        plt.xlabel('Age')
+        plt.ylabel('Frequency')
+        plt.title('Age Distribution Across Clusters')
+        plt.legend()
+        visualizations['age_distribution'] = plt
 
         return visualizations
 
@@ -316,18 +314,19 @@ def main():
         )
     
     with tab3:
-        st.markdown("### 📈 Interactive Visualizations")
+        st.markdown("### 📈 Visualizations")
         
         # Generate visualizations
         visualizations = model.create_visualizations()
         
-        # Display visualizations in columns
-        cols = st.columns(2)
-        
-        viz_keys = list(visualizations.keys())
-        for i, key in enumerate(viz_keys):
-            with cols[i % 2]:
-                st.plotly_chart(visualizations[key], use_container_width=True)
+        # Display visualizations
+        st.pyplot(visualizations['cluster_distribution'])
+        st.pyplot(visualizations['income_vs_spending'])
+        st.pyplot(visualizations['age_distribution'])
+
+        # Warn about Plotly unavailability
+        if not PLOTLY_AVAILABLE:
+            st.warning("Note: Plotly is not installed. Using Matplotlib for visualizations.")
     
     with tab4:
         st.markdown("### 📋 Full Dataset")
