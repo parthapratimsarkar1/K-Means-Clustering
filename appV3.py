@@ -40,10 +40,6 @@ st.markdown("""
             border-radius: 5px;
             font-weight: bold;
         }
-        .metric-container p {
-            margin: 5px 0;
-            font-size: 16px;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -137,21 +133,6 @@ class CustomerSegmentation:
                     'gender_distribution': {}
                 }
 
-    def predict_segment(self, customer_id, gender, age, income, spending):
-        input_data = np.array([[age, income, spending]])
-        scaled_input = self.scaler.transform(input_data)
-        
-        distances = []
-        for cluster in self.df['Cluster'].unique():
-            cluster_data = self.df[self.df['Cluster'] == cluster]
-            cluster_center = cluster_data[self.features].mean()
-            scaled_center = self.scaler.transform([cluster_center])
-            distance = np.linalg.norm(scaled_input - scaled_center)
-            distances.append((cluster, distance))
-        
-        predicted_cluster = min(distances, key=lambda x: x[1])[0]
-        return predicted_cluster, self.cluster_info[predicted_cluster]
-
 def main():
     # Header with professional styling
     st.markdown('<div class="main-header"><h1>Customer Segmentation System</h1></div>', unsafe_allow_html=True)
@@ -162,40 +143,17 @@ def main():
         st.error("Failed to initialize the model. Please check your dataset.")
         return
     
-    # Sidebar with customer inputs
-    with st.sidebar:
-        st.markdown("### 📊 Customer Profile Analysis")
-        st.markdown("---")
-        
-        if st.button("View Full Dataset"):
-            st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
-                         .format({'Cluster': 'Cluster {}'}))
-        
-        st.markdown("---")
-        
-        customer_id = st.text_input("📋 Customer ID")
-        gender = st.selectbox("👤 Gender", options=["Male", "Female"])
-        age = st.number_input("🎂 Age", min_value=0, max_value=100, value=30)
-        income = st.number_input("💵 Income (INR)", min_value=0, value=50000)
-        spending = st.number_input("🛍️ Spending (1-100)", min_value=0, max_value=100, value=50)
-        
-        if st.button("Analyze Customer"):
-            if all([customer_id, gender, age, income, spending]):
-                try:
-                    cluster, info = model.predict_segment(customer_id, gender, age, income, spending)
-                    st.markdown(f"""
-                        <div class="cluster-card">
-                            <span class="cluster-badge">Cluster {cluster}</span>
-                            <h4>{model.cluster_descriptions[cluster]}</h4>
-                            <p>{model.cluster_details[cluster]}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                except Exception as e:
-                    st.error(f"Error in customer analysis: {e}")
-            else:
-                st.warning("⚠️ Please complete all fields")
+    # Data Overview Section
+    st.markdown("### 📊 Data Overview")
+    st.write("Explore a preview of the dataset and key statistics.")
     
-    # Cluster Overview
+    with st.expander("🔍 View Dataset Preview"):
+        st.dataframe(model.df.head())
+    
+    with st.expander("📈 Dataset Statistics"):
+        st.write(model.df.describe())
+    
+    # Cluster Overview Section
     st.markdown("### 📊 Cluster Overview")
     for cluster in sorted(model.cluster_descriptions.keys()):
         with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
