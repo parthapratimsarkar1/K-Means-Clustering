@@ -18,7 +18,32 @@ st.set_page_config(
 # Enhanced Custom CSS with cluster number styling
 st.markdown("""
     <style>
-        /* [Previous CSS remains the same] */
+        .main-header {
+            text-align: center;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .cluster-card {
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .cluster-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .metric-container p {
+            margin: 5px 0;
+            font-size: 16px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -53,8 +78,6 @@ class CustomerSegmentation:
 
             self.process_data()
             self.analyze_clusters()
-            
-            # Dynamically generate cluster descriptions based on actual clusters
             self.generate_cluster_descriptions()
 
         except Exception as e:
@@ -66,52 +89,37 @@ class CustomerSegmentation:
         self.df['Gender_Encoded'] = le.fit_transform(self.df['Gender'])
         self.gender_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
         
-        # Specify the exact column names from your dataset
         self.features = ['Age', 'Income (INR)', 'Spending (1-100)']
         self.scaler = StandardScaler()
         
-        # Add error handling for scaling
         try:
             self.scaled_features = self.scaler.fit_transform(self.df[self.features])
         except Exception as e:
             st.error(f"Error in data scaling: {e}")
-            st.error("Ensure all feature columns contain numeric data")
             raise
     
     def generate_cluster_descriptions(self):
-        # Dynamically create cluster descriptions based on actual clusters
-        unique_clusters = sorted(self.df['Cluster'].unique())
+        self.cluster_descriptions = {
+            0: "🏦 Conservative Spenders (High Income)",
+            1: "⚖️ Balanced Customers",
+            2: "💎 Premium Customers",
+            3: "⚠️ Risk Group"
+        }
         
-        # Default emoji and description templates
-        emojis = ['🏦', '⚖️', '💎', '⚠️', '💰', '📈']
-        descriptions = [
-            "Conservative Spenders",
-            "Balanced Customers", 
-            "Premium Customers", 
-            "Risk Group", 
-            "Budget Conscious", 
-            "Moderate Savers"
-        ]
-        
-        self.cluster_descriptions = {}
-        self.cluster_details = {}
-        
-        for idx, cluster in enumerate(unique_clusters):
-            emoji = emojis[idx] if idx < len(emojis) else '📊'
-            description = descriptions[idx] if idx < len(descriptions) else 'Customer Group'
-            
-            self.cluster_descriptions[cluster] = f"{emoji} {description}"
-            self.cluster_details[cluster] = f"Cluster {cluster} customer group with unique characteristics"
+        self.cluster_details = {
+            0: "High income earners with conservative spending habits",
+            1: "Customers with balanced earning and spending patterns",
+            2: "High-income customers with premium spending habits",
+            3: "Lower income group with higher spending patterns"
+        }
     
     def analyze_clusters(self):
-        # Ensure that all possible clusters are processed
         unique_clusters = sorted(self.df['Cluster'].unique())
         self.cluster_info = {}
         
         for cluster in unique_clusters:
             cluster_data = self.df[self.df['Cluster'] == cluster]
             
-            # Handle cases where a cluster might be empty
             if len(cluster_data) > 0:
                 self.cluster_info[cluster] = {
                     'size': len(cluster_data),
@@ -121,7 +129,6 @@ class CustomerSegmentation:
                     'gender_distribution': cluster_data['Gender'].value_counts().to_dict()
                 }
             else:
-                # Provide a default empty cluster info
                 self.cluster_info[cluster] = {
                     'size': 0,
                     'avg_age': 0,
@@ -155,12 +162,11 @@ def main():
         st.error("Failed to initialize the model. Please check your dataset.")
         return
     
-    # Sidebar with improved styling
+    # Sidebar with customer inputs
     with st.sidebar:
         st.markdown("### 📊 Customer Profile Analysis")
         st.markdown("---")
         
-        # Add an option to view the CSV file
         if st.button("View Full Dataset"):
             st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
                          .format({'Cluster': 'Cluster {}'}))
@@ -173,76 +179,36 @@ def main():
         income = st.number_input("💵 Income (INR)", min_value=0, value=50000)
         spending = st.number_input("🛍️ Spending (1-100)", min_value=0, max_value=100, value=50)
         
-        st.markdown("---")
         if st.button("Analyze Customer"):
             if all([customer_id, gender, age, income, spending]):
                 try:
                     cluster, info = model.predict_segment(customer_id, gender, age, income, spending)
-                    
                     st.markdown(f"""
-                        <div class="prediction-result">
-                            <h3 style="color: #1a237e;">Predicted Segment</h3>
-                            <div class="cluster-card">
-                                <span class="cluster-badge">Cluster {cluster}</span>
-                                <h4>{model.cluster_descriptions[cluster]}</h4>
-                                <p>{model.cluster_details[cluster]}</p>
-                            </div>
+                        <div class="cluster-card">
+                            <span class="cluster-badge">Cluster {cluster}</span>
+                            <h4>{model.cluster_descriptions[cluster]}</h4>
+                            <p>{model.cluster_details[cluster]}</p>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    with st.expander("📊 Detailed Statistics"):
-                        st.markdown(f"""
-                            <div class="metric-container">
-                                <p>👥 Cluster Size: {info['size']} customers</p>
-                                <p>📅 Average Age: {info['avg_age']} years</p>
-                                <p>💰 Average Income: ₹{info['avg_income']:,}</p>
-                                <p>🛍️ Average Spending: {info['avg_spending']}</p>
-                            </div>
-                        """, unsafe_allow_html=True)
                 except Exception as e:
                     st.error(f"Error in customer analysis: {e}")
             else:
                 st.warning("⚠️ Please complete all fields")
     
-    # Main content area
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("### 📊 Cluster Overview")
-        for cluster in sorted(model.cluster_descriptions.keys()):
-            with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
-                info = model.cluster_info.get(cluster, {
-                    'size': 0,
-                    'avg_age': 0,
-                    'avg_income': 0,
-                    'avg_spending': 0,
-                    'gender_distribution': {}
-                })
-                st.markdown(f"""
-                    <div class="cluster-card">
-                        <span class="cluster-badge">Cluster {cluster}</span>
-                        <p>{model.cluster_details.get(cluster, "No description available")}</p>
-                        <hr>
-                        <h4>Key Metrics:</h4>
-                        <p>👥 Cluster Size: {info['size']} customers</p>
-                        <p>📅 Average Age: {info['avg_age']} years</p>
-                        <p>💰 Average Income: ₹{info['avg_income']:,}</p>
-                        <p>🛍️ Average Spending Score: {info['avg_spending']}</p>
-                        <h4>Gender Distribution:</h4>
-                        <p>{'  |  '.join(f'{gender}: {count}' for gender, count in info.get('gender_distribution', {}).items())}</p>
-                    </div>
-                """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("### 📈 Data Overview")
-        st.markdown('<div class="stCard">', unsafe_allow_html=True)
-        df_display = model.df.copy()
-        st.dataframe(
-            df_display.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
-                          .format({'Cluster': 'Cluster {}'}),
-            height=400
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Cluster Overview
+    st.markdown("### 📊 Cluster Overview")
+    for cluster in sorted(model.cluster_descriptions.keys()):
+        with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
+            info = model.cluster_info.get(cluster, {})
+            st.markdown(f"""
+                <div class="cluster-card">
+                    <p>{model.cluster_details[cluster]}</p>
+                    <p>👥 Cluster Size: {info['size']} customers</p>
+                    <p>📅 Average Age: {info['avg_age']} years</p>
+                    <p>💰 Average Income: ₹{info['avg_income']:,}</p>
+                    <p>🛍️ Average Spending Score: {info['avg_spending']}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
 if __name__ == '__main__':
     main()
