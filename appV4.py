@@ -74,6 +74,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def process_clusters(df):
+    # Convert Cluster column to integer, handling potential issues
+    try:
+        # First, try to convert to numeric, coercing errors to NaN
+        df['Cluster'] = pd.to_numeric(df['Cluster'], errors='coerce')
+        
+        # Replace NaN with a default value (e.g., -1 for unclassified)
+        df['Cluster'] = df['Cluster'].fillna(-1).astype(int)
+        
+        # If no clusters found, add a warning
+        if df['Cluster'].nunique() <= 1:
+            st.warning("Warning: Only one or no distinct clusters found. Check your clustering results.")
+    
+    except Exception as e:
+        st.error(f"Error processing cluster values: {e}")
+    
+    return df
+
 class CustomerSegmentation:
     def __init__(self, csv_path='Customer-Dataset-With-ClusteredDB.csv'):
         try:
@@ -93,6 +111,9 @@ class CustomerSegmentation:
             else:
                 st.error("Could not read the CSV file with any standard encoding")
                 raise
+
+            # Process clusters first
+            self.df = process_clusters(self.df)
 
             # Validate required columns
             required_columns = ['Age', 'Income (INR)', 'Spending (1-100)', 'Gender', 'Cluster']
@@ -126,21 +147,19 @@ class CustomerSegmentation:
             raise
     
     def generate_cluster_descriptions(self):
-        self.cluster_descriptions = {
-            -0: "🚫 Noise Points (Outliers)",
-            0: "🏦 Conservative Spenders",
-            1: "⚠️ Risk Customers",
-            2: "💎 Premium Customers",
-            3: "⚖️ Balanced Group"
-        }
+        # Dynamically generate cluster descriptions based on unique cluster values
+        unique_clusters = sorted(self.df['Cluster'].unique())
+        self.cluster_descriptions = {}
+        self.cluster_details = {}
         
-        self.cluster_details = {
-            -0: "Unclassified or Outlier Data Points",
-            0: "Middle Income, Moderate Spending",
-            1: "Low Income, Low Spending",
-            2: "High Income, High Spending",
-            3: "Upper Middle Income, Low Spending"
-        }
+        for cluster in unique_clusters:
+            if cluster == -1:
+                self.cluster_descriptions[cluster] = "🚫 Noise Points (Outliers)"
+                self.cluster_details[cluster] = "Unclassified or Outlier Data Points"
+            else:
+                # You can customize these descriptions based on your specific clusters
+                self.cluster_descriptions[cluster] = f"📊 Cluster {cluster}"
+                self.cluster_details[cluster] = f"Cluster {cluster} Details"
     
     def analyze_clusters(self):
         unique_clusters = sorted(self.df['Cluster'].unique())
