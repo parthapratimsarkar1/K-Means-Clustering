@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 
-def load_and_preprocess_data(file_path='Mall_Customers_with_Clusters.csv'):
+def load_and_preprocess_data(file_path='Mall_Customers.csv'):
     # Load the dataset
     data = pd.read_csv(file_path)
     
@@ -21,7 +21,7 @@ def load_and_preprocess_data(file_path='Mall_Customers_with_Clusters.csv'):
     
     return data, scaler, dbscan
 
-def predict_cluster(input_data, scaler, dbscan):
+def predict_cluster(input_data, scaler, dbscan, original_data):
     # Prepare input data for clustering
     input_features = np.array([[input_data['Annual Income (k$)'], 
                                 input_data['Spending Score (1-100)']]])
@@ -29,8 +29,18 @@ def predict_cluster(input_data, scaler, dbscan):
     # Scale the input features
     input_scaled = scaler.transform(input_features)
     
-    # Predict cluster
-    cluster = dbscan.fit_predict(input_scaled)[0]
+    # Combine input with original data for clustering
+    X_original = original_data[['Annual Income (k$)', 'Spending Score (1-100)']].values
+    X_original_scaled = scaler.transform(X_original)
+    
+    # Combine scaled data
+    X_combined = np.vstack([X_original_scaled, input_scaled])
+    
+    # Refit DBSCAN with combined data
+    combined_labels = dbscan.fit_predict(X_combined)
+    
+    # The last label is the cluster for the new point
+    cluster = combined_labels[-1]
     
     return cluster
 
@@ -57,15 +67,59 @@ def main():
             'Spending Score (1-100)': spending_score
         }
         
-        cluster = predict_cluster(input_data, scaler, dbscan)
+        # Predict cluster
+        cluster = predict_cluster(input_data, scaler, dbscan, data)
         
         # Display results
         st.header('Clustering Results')
         
         # Cluster interpretation
         if cluster == -1:
-            st.error('Noise Point: This customer does not belong to any specific cluster')
-            st.write('This might indicate an outlier or unique customer profile')
+            st.warning('Customer Profile is Unique')
+            st.write('This customer does not fit into any existing cluster patterns.')
+            
+            # Additional insights for unique customers
+            st.subheader('Unique Customer Insights')
+            
+            # Compare input to overall dataset statistics
+            income_mean = data['Annual Income (k$)'].mean()
+            income_std = data['Annual Income (k$)'].std()
+            spending_mean = data['Spending Score (1-100)'].mean()
+            spending_std = data['Spending Score (1-100)'].std()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric('Annual Income', 
+                          f"${annual_income}k", 
+                          delta=f"{(annual_income - income_mean)/income_std:.2f} std from mean")
+            with col2:
+                st.metric('Spending Score', 
+                          f"{spending_score}", 
+                          delta=f"{(spending_score - spending_mean)/spending_std:.2f} std from mean")
+            
+            # Visualize position relative to other clusters
+            st.subheader('Customer Position Relative to Clusters')
+            fig, ax = plt.subplots(figsize=(10, 6))
+            scatter = ax.scatter(
+                data['Annual Income (k$)'], 
+                data['Spending Score (1-100)'], 
+                c=data['Cluster'], 
+                cmap='viridis'
+            )
+            ax.scatter(
+                annual_income, 
+                spending_score, 
+                color='red', 
+                marker='x', 
+                s=200, 
+                label='New Customer'
+            )
+            ax.set_xlabel('Annual Income (k$)')
+            ax.set_ylabel('Spending Score (1-100)')
+            ax.set_title('Customer Positioning')
+            plt.colorbar(scatter, label='Cluster')
+            ax.legend()
+            st.pyplot(fig)
         else:
             st.success(f'Cluster {cluster}: Customer belongs to Cluster {cluster}')
             
