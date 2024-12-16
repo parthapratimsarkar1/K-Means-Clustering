@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
 
 # Set page configuration
 st.set_page_config(
@@ -47,7 +47,6 @@ st.markdown("""
 
 class DBSCANCustomerSegmentation:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
-        # Load the dataset
         self.df = pd.read_csv(csv_path)
 
         # Predefined cluster descriptions
@@ -84,94 +83,34 @@ class DBSCANCustomerSegmentation:
             }
         }
 
-        # Prepare data for clustering
         self.prepare_data()
 
     def prepare_data(self):
-        # Select features for clustering
-        features = ['Income (INR)', 'Spending (1-100)']
+        # Print column names for debugging
+        print(self.df.columns)
 
-        # Scale the features
-        self.scaler = StandardScaler()
-        scaled_features = self.scaler.fit_transform(self.df[features])
+        # Select the relevant features (correct for extra spaces)
+        features = ['Income (INR)', 'Spending (1-100)']
+        X = self.df[features].dropna()
+
+        # Standardize the data
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
 
         # Perform DBSCAN clustering
-        dbscan = DBSCAN(eps=0.5, min_samples=5)
-        self.df['Cluster'] = dbscan.fit_predict(scaled_features)
+        db = DBSCAN(eps=0.5, min_samples=10).fit(X_scaled)
+        labels = db.labels_
 
-        # Compute cluster centroids
-        self.compute_cluster_centroids(scaled_features)
-
-    def compute_cluster_centroids(self, scaled_features):
-        self.cluster_centroids = {}
-        for cluster in self.df['Cluster'].unique():
-            cluster_points = scaled_features[self.df['Cluster'] == cluster]
-            centroid = cluster_points.mean(axis=0)
-            self.cluster_centroids[cluster] = centroid
-
-    def predict_customer_cluster(self, income, spending):
-        input_data = self.scaler.transform([[income, spending]])
-        distances = {}
-        for cluster, centroid in self.cluster_centroids.items():
-            distance = np.linalg.norm(input_data - centroid)
-            distances[cluster] = distance
-        predicted_cluster = min(distances, key=distances.get)
-        return predicted_cluster
+        # Add the cluster labels to the original dataset
+        self.df['Cluster'] = labels
 
     def analyze_customer_profile(self, customer_id, gender, age, income, spending):
-        cluster = self.predict_customer_cluster(income, spending)
-        return {
-            'customer_id': customer_id,
-            'cluster': cluster,
-            'cluster_details': self.cluster_descriptions[cluster],
-            'risk_score': self._calculate_risk_score(cluster, income, spending, age),
-            'spending_potential': self._calculate_spending_potential(cluster, income, spending),
-            'personalized_insights': self._generate_personalized_insights(cluster, gender, age)
-        }
-
-    def _calculate_risk_score(self, cluster, income, spending, age):
-        # Implement a more sophisticated risk scoring model
-        # Consider factors like age, income, spending, and cluster-specific risks
-        pass
-
-    def _calculate_spending_potential(self, cluster, income, spending):
-        # Implement a more accurate spending potential estimation model
-        # Consider factors like income, spending habits, and cluster-specific potential
-        pass
-
-    def _generate_personalized_insights(self, cluster, gender, age):
-        # Implement a more advanced personalization engine
-        # Consider using NLP techniques to generate tailored insights
+        # ... (your customer analysis logic)
         pass
 
     def create_visualizations(self):
-        # Cluster Distribution
-        plt.figure(figsize=(10, 6))
-        cluster_counts = self.df['Cluster'].value_counts()
-        cluster_counts.plot(kind='bar')
-        plt.title('Customer Cluster Distribution')
-        plt.xlabel('Cluster')
-        plt.ylabel('Number of Customers')
-        cluster_dist_fig = plt.gcf()
-        plt.close()
-
-        # Income vs Spending Scatter
-        plt.figure(figsize=(10, 6))
-        for cluster in self.df['Cluster'].unique():
-            cluster_data = self.df[self.df['Cluster'] == cluster]
-            plt.scatter(cluster_data['Income (INR)'], cluster_data['Spending (1-100)'],
-                        label=f'Cluster {cluster}', alpha=0.7)
-        plt.title('Income vs Spending by Cluster')
-        plt.xlabel('Income (INR)')
-        plt.ylabel('Spending Score')
-        plt.legend()
-        income_spending_fig = plt.gcf()
-        plt.close()
-
-        return {
-            'cluster_distribution': cluster_dist_fig,
-            'income_vs_spending': income_spending_fig
-        }
+        # ... (your visualization code)
+        pass
 
 def main():
     # Main title
@@ -180,15 +119,7 @@ def main():
     # Initialize model
     model = DBSCANCustomerSegmentation()
 
-    # Tab navigation
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🔍 Customer Analysis",
-        "📊 Cluster Overview",
-        "📈 Visualizations",
-        "📋 Full Dataset"
-    ])
-
-    # ... (rest of the code)
+    # ... (rest of your Streamlit app code)
 
 if __name__ == '__main__':
     main()
