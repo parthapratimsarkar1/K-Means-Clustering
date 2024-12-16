@@ -1,107 +1,104 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
-import seaborn as sns
 
 def load_data():
     """Load the customer dataset"""
     return pd.read_csv('Customers Dataset DBSCAN With Cluster.csv')
 
-def perform_clustering(data, features, eps, min_samples):
+def prepare_clustering_model(data):
     """
-    Perform DBSCAN clustering on selected features
-    
-    Parameters:
-    - data: Input DataFrame
-    - features: List of features to use for clustering
-    - eps: Epsilon (neighborhood distance) parameter
-    - min_samples: Minimum number of samples in a neighborhood
+    Prepare the clustering model using selected features
     
     Returns:
-    - Clustered DataFrame
+    - Scaled features
+    - Scaler object
     - DBSCAN model
     """
     # Select features for clustering
-    X = data[features]
+    features = ['CustomerID', 'Gender', 'Age', 'Income (INR)', 'Spending  (1-100)']
+    
+    # Preprocess the data
+    # Convert Gender to numeric
+    gender_map = {'Male': 0, 'Female': 1}
+    data['Gender_Numeric'] = data['Gender'].map(gender_map)
+    
+    # Select features for clustering (including numeric gender)
+    X = data[['Age', 'Income (INR)', 'Spending  (1-100)', 'Gender_Numeric']]
     
     # Standardize the features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
     # Perform DBSCAN clustering
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+    dbscan = DBSCAN(eps=0.5, min_samples=3)
     data['Cluster'] = dbscan.fit_predict(X_scaled)
     
-    return data, dbscan
+    return X_scaled, scaler, dbscan, data
 
-def plot_clusters(data, x_feature, y_feature):
+def predict_cluster(input_data, scaler, dbscan_model):
     """
-    Create a scatter plot of clusters
+    Predict the cluster for input data
     
     Parameters:
-    - data: Clustered DataFrame
-    - x_feature: Feature for x-axis
-    - y_feature: Feature for y-axis
+    - input_data: Input features
+    - scaler: Fitted StandardScaler
+    - dbscan_model: Trained DBSCAN model
     
     Returns:
-    - Matplotlib figure
+    - Predicted cluster
     """
-    plt.figure(figsize=(10, 6))
-    scatter = sns.scatterplot(data=data, x=x_feature, y=y_feature, hue='Cluster', palette='viridis')
-    plt.title(f'Clustering Results: {x_feature} vs {y_feature}')
-    return scatter.get_figure()
+    # Scale the input data
+    input_scaled = scaler.transform(input_data)
+    
+    # Predict cluster
+    predicted_cluster = dbscan_model.fit_predict(input_scaled)
+    
+    return predicted_cluster[0]
 
 def main():
-    st.title('Customer Clustering Analysis with DBSCAN')
+    st.title('Customer Cluster Predictor')
     
-    # Load data
+    # Load and prepare data
     data = load_data()
+    _, scaler, dbscan_model, clustered_data = prepare_clustering_model(data)
     
-    # Sidebar for input parameters
-    st.sidebar.header('Clustering Parameters')
+    # Input form
+    st.header('Enter Customer Details')
     
-    # Feature selection
-    available_features = ['Age', 'Income (INR)', 'Spending  (1-100)', 'CIBIL Score']
-    selected_features = st.sidebar.multiselect(
-        'Select Features for Clustering', 
-        available_features, 
-        default=['Age', 'Income (INR)']
-    )
+    # Input fields
+    customer_id = st.number_input('Customer ID', min_value=1, value=1)
     
-    # DBSCAN parameters
-    eps = st.sidebar.slider('Epsilon (neighborhood distance)', 0.1, 2.0, 0.5, 0.1)
-    min_samples = st.sidebar.slider('Minimum Samples', 1, 10, 3, 1)
+    # Gender selection
+    gender = st.selectbox('Gender', ['Male', 'Female'])
     
-    # Visualization features
-    x_feature = st.sidebar.selectbox('X-axis Feature', selected_features, index=0)
-    y_feature = st.sidebar.selectbox('Y-axis Feature', selected_features, index=1)
+    # Numeric inputs
+    age = st.number_input('Age', min_value=1, max_value=100, value=25)
+    income = st.number_input('Income (INR)', min_value=1000, max_value=1000000, value=15000)
+    spending = st.number_input('Spending (1-100)', min_value=1, max_value=100, value=50)
     
-    # Perform clustering
-    if len(selected_features) >= 2:
-        clustered_data, dbscan_model = perform_clustering(data, selected_features, eps, min_samples)
+    # Predict button
+    if st.button('Predict Cluster'):
+        # Prepare input data
+        gender_numeric = 0 if gender == 'Male' else 1
+        input_data = np.array([[age, income, spending, gender_numeric]])
         
-        # Display clustering results
-        st.subheader('Clustering Results')
+        # Predict cluster
+        predicted_cluster = predict_cluster(input_data, scaler, dbscan_model)
         
-        # Cluster distribution
-        cluster_counts = clustered_data['Cluster'].value_counts()
-        st.write('Cluster Distribution:')
-        st.write(cluster_counts)
+        # Display results
+        st.subheader('Clustering Result')
+        st.write(f'Predicted Cluster: {predicted_cluster}')
         
-        # Visualization
-        st.subheader('Cluster Visualization')
-        fig = plot_clusters(clustered_data, x_feature, y_feature)
-        st.pyplot(fig)
-        
-        # Detailed cluster information
-        st.subheader('Cluster Details')
-        cluster_details = clustered_data.groupby('Cluster')[selected_features].mean()
-        st.write(cluster_details)
-    else:
-        st.warning('Please select at least 2 features for clustering')
+        # Additional context about the cluster
+        if predicted_cluster != -1:
+            cluster_data = clustered_data[clustered_data['Cluster'] == predicted_cluster]
+            st.write('Cluster Characteristics:')
+            st.write(cluster_data[['Age', 'Income (INR)', 'Spending  (1-100)', 'Gender']].describe())
+        else:
+            st.write('This data point is considered an outlier (Noise) by the DBSCAN algorithm.')
 
 if __name__ == '__main__':
     main()
