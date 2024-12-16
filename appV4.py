@@ -2,194 +2,246 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 class CustomerSegmentationAnalysis:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
         # Load the dataset
         self.df = pd.read_csv(csv_path)
         
-        # Predefined cluster descriptions
+        # Predefined cluster characteristics
         self.cluster_descriptions = {
-            -1: "🚨 Noise Points (Outliers)",
-            0: "💼 Middle Income, Moderate Spending",
-            1: "📉 Low Income, Low Spending",
-            2: "💎 High Income, High Spending",
-            3: "💰 Upper Middle Income, Low Spending"
-        }
-        
-        # Cluster characteristics
-        self.cluster_characteristics = {
-            -1: {"Mean_Income": "Varies", "Mean_Spending": "Varies"},
-            0: {"Mean_Income": 49733, "Mean_Spending": 52.79},
-            1: {"Mean_Income": 24583, "Mean_Spending": 9.58},
-            2: {"Mean_Income": 80375, "Mean_Spending": 82.94},
-            3: {"Mean_Income": 83423, "Mean_Spending": 13.77}
-        }
-
-    def analyze_customer_profile(self, gender, age, income, spending):
-        """
-        Analyze a customer's profile based on input parameters
-        """
-        # Find the closest cluster based on income and spending
-        distances = {}
-        for cluster, chars in self.cluster_characteristics.items():
-            if cluster == -1:  # Skip noise cluster
-                continue
-            
-            # Calculate normalized distance
-            income_diff = abs(income - chars['Mean_Income']) / 100000  # Normalize income
-            spending_diff = abs(spending - chars['Mean_Spending']) / 100  # Normalize spending
-            
-            # Weighted distance calculation
-            distance = np.sqrt((income_diff * 0.6)**2 + (spending_diff * 0.4)**2)
-            distances[cluster] = distance
-        
-        # Find the closest cluster
-        closest_cluster = min(distances, key=distances.get)
-        
-        # Additional profile insights
-        profile_insights = {
-            "Cluster": closest_cluster,
-            "Cluster Description": self.cluster_descriptions[closest_cluster],
-            "Income Comparison": self._compare_income(income),
-            "Spending Comparison": self._compare_spending(spending),
-            "Age Group": self._categorize_age(age),
-            "Potential Marketing Segment": self._get_marketing_segment(closest_cluster, gender, age)
-        }
-        
-        return profile_insights
-
-    def _compare_income(self, income):
-        """Compare income to cluster averages"""
-        if income < 30000:
-            return "Low Income Range"
-        elif 30000 <= income < 50000:
-            return "Lower Middle Income Range"
-        elif 50000 <= income < 80000:
-            return "Middle Income Range"
-        elif 80000 <= income < 100000:
-            return "Upper Middle Income Range"
-        else:
-            return "High Income Range"
-
-    def _compare_spending(self, spending):
-        """Compare spending to cluster averages"""
-        if spending < 20:
-            return "Very Low Spending"
-        elif 20 <= spending < 40:
-            return "Low Spending"
-        elif 40 <= spending < 60:
-            return "Moderate Spending"
-        elif 60 <= spending < 80:
-            return "High Spending"
-        else:
-            return "Very High Spending"
-
-    def _categorize_age(self, age):
-        """Categorize age groups"""
-        if age < 25:
-            return "Young Adult"
-        elif 25 <= age < 40:
-            return "Working Professional"
-        elif 40 <= age < 55:
-            return "Established Adult"
-        else:
-            return "Senior"
-
-    def _get_marketing_segment(self, cluster, gender, age):
-        """Determine marketing segment based on cluster, gender, and age"""
-        age_group = self._categorize_age(age)
-        
-        segment_mapping = {
             0: {
-                "Young Adult": "Value-Conscious Millennial",
-                "Working Professional": "Balanced Spender",
-                "Established Adult": "Steady Consumer",
-                "Senior": "Conservative Moderate Spender"
+                'name': '🏦 Conservative Spenders',
+                'description': 'High Income, Moderate Spending',
+                'color': '#3498db',
+                'icon': '💰'
             },
             1: {
-                "Young Adult": "Budget-Conscious Student",
-                "Working Professional": "Frugal Professional",
-                "Established Adult": "Cost-Sensitive Family",
-                "Senior": "Fixed Income Saver"
+                'name': '⚖️ Balanced Customers', 
+                'description': 'Moderate Income, Balanced Spending',
+                'color': '#2ecc71',
+                'icon': '⚖️'
             },
             2: {
-                "Young Adult": "Luxury-Seeking Millennial",
-                "Working Professional": "Premium Lifestyle Professional",
-                "Established Adult": "High-End Consumer",
-                "Senior": "Affluent Retiree"
+                'name': '💎 Premium Customers',
+                'description': 'High Income, High Spending',
+                'color': '#9b59b6',
+                'icon': '💎'
             },
             3: {
-                "Young Adult": "Strategic Saver",
-                "Working Professional": "Investment-Focused Professional",
-                "Established Adult": "High Income, Low Consumption",
-                "Senior": "Wealth Accumulator"
+                'name': '⚠️ Risk Group',
+                'description': 'High Income, Low Spending',
+                'color': '#e74c3c',
+                'icon': '⚠️'
+            },
+            -1: {
+                'name': '🌟 Unique Outliers',
+                'description': 'Non-Standard Customer Profile',
+                'color': '#f39c12',
+                'icon': '🌟'
             }
         }
+
+    def analyze_customer_profile(self, customer_id, gender, age, income, spending):
+        # Simulate cluster assignment and analysis
+        cluster = self._predict_cluster(income, spending)
         
-        return f"{gender} {segment_mapping.get(cluster, {}).get(age_group, 'Undefined Segment')}"
+        return {
+            'customer_id': customer_id,
+            'cluster': cluster,
+            'cluster_details': self.cluster_descriptions[cluster],
+            'risk_score': self._calculate_risk_score(cluster, income, spending, age),
+            'spending_potential': self._calculate_spending_potential(cluster, income, spending),
+            'personalized_insights': self._generate_personalized_insights(cluster, gender, age)
+        }
+
+    def _predict_cluster(self, income, spending):
+        # Simple clustering logic based on income and spending
+        if income > 80000 and spending < 30:
+            return 3  # Risk Group
+        elif income > 80000 and spending > 70:
+            return 2  # Premium Customers
+        elif income > 40000 and 30 <= spending <= 70:
+            return 1  # Balanced Customers
+        elif income <= 40000:
+            return 0  # Conservative Spenders
+        else:
+            return -1  # Outliers
+
+    def _calculate_risk_score(self, cluster, income, spending, age):
+        # Generate a risk score based on multiple factors
+        base_risk = {
+            0: 30,   # Conservative Spenders
+            1: 50,   # Balanced Customers
+            2: 60,   # Premium Customers
+            3: 80,   # Risk Group
+            -1: 70   # Outliers
+        }
+        
+        risk_modifier = (age / 100) * 20  # Age impacts risk
+        spending_variance = abs(spending - 50)  # Distance from average spending
+        
+        return min(base_risk.get(cluster, 50) + risk_modifier + (spending_variance / 2), 100)
+
+    def _calculate_spending_potential(self, cluster, income, spending):
+        # Estimate future spending potential
+        potential_map = {
+            0: 0.4,  # Conservative
+            1: 0.6,  # Balanced
+            2: 0.9,  # Premium
+            3: 0.3,  # Risk Group
+            -1: 0.5  # Outliers
+        }
+        
+        base_potential = potential_map.get(cluster, 0.5)
+        income_factor = min(income / 100000, 1)  # Normalize income
+        
+        return min(base_potential * income_factor * 100, 100)
+
+    def _generate_personalized_insights(self, cluster, gender, age):
+        # Generate personalized marketing insights
+        age_groups = {
+            (18, 30): 'Young Professional',
+            (31, 45): 'Mid-Career',
+            (46, 60): 'Established Professional',
+            (61, 100): 'Senior'
+        }
+        
+        age_group = next(
+            group_name for (min_age, max_age), group_name in age_groups.items() 
+            if min_age <= age <= max_age
+        )
+        
+        insights = {
+            0: f"{gender} {age_group} - Conservative Investor, Prefers Stability",
+            1: f"{gender} {age_group} - Balanced Financial Approach",
+            2: f"{gender} {age_group} - High-Value Customer, Premium Experiences",
+            3: f"{gender} {age_group} - Potential High-Growth Customer",
+            -1: f"{gender} {age_group} - Unique Financial Profile"
+        }
+        
+        return insights.get(cluster, "Unique Customer Profile")
 
 def main():
+    # Page configuration
+    st.set_page_config(
+        page_title="Customer Segmentation System", 
+        page_icon="📊", 
+        layout="wide"
+    )
+
     # Custom CSS
     st.markdown("""
     <style>
-        .main-header {
-            text-align: center;
-            background-color: #f4f4f4;
+        .main-container {
+            background-color: #f4f6f9;
             padding: 20px;
+            border-radius: 15px;
+        }
+        .analysis-card {
+            background-color: white;
             border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
             margin-bottom: 20px;
         }
-        .result-card {
-            background-color: #f9f9f9;
-            border: 1px solid #e0e0e0;
+        .cluster-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background-color: #e9ecef;
             border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
+            margin: 5px;
+            padding: 10px;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Title
-    st.markdown('<div class="main-header"><h1>📊 Customer Profile Analysis</h1></div>', unsafe_allow_html=True)
+    # Main title
+    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>📊 Customer Segmentation System</h1>", unsafe_allow_html=True)
 
-    # Initialize the analysis model
+    # Initialize analysis model
     model = CustomerSegmentationAnalysis()
 
-    # Input form
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        gender = st.selectbox("👤 Gender", ["Male", "Female", "Other"])
-        age = st.number_input("🎂 Age", min_value=18, max_value=100, value=30)
-    
-    with col2:
-        income = st.number_input("💵 Income (INR)", min_value=1000, max_value=1000000, value=50000, step=1000)
-        spending = st.number_input("🛍️ Spending Score (1-100)", min_value=1, max_value=100, value=50)
+    # Tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🔍 Customer Analysis", 
+        "📊 Data Overview", 
+        "📈 Visualizations", 
+        "📋 Full Dataset", 
+        "📊 Cluster Overview"
+    ])
 
-    # Analyze button
-    if st.button("🔍 Analyze Customer Profile"):
-        # Perform analysis
-        profile = model.analyze_customer_profile(gender, age, income, spending)
+    with tab1:
+        st.markdown("### 📋 Customer Profile Input")
         
-        # Display results
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
         
-        st.markdown(f"""
-        ### 📊 Customer Segmentation Analysis
+        with col1:
+            customer_id = st.text_input("📋 Customer ID", value=f"CUS-{random.randint(1000, 9999)}")
+            gender = st.selectbox("👤 Gender", ["Male", "Female", "Other"])
         
-        **Cluster:** {profile['Cluster']} - {profile['Cluster Description']}
+        with col2:
+            age = st.slider("🎂 Age", 18, 100, 35)
+            income = st.number_input("💵 Income (INR)", min_value=1000, max_value=1000000, value=50000, step=1000)
         
-        **Income Profile:** {profile['Income Comparison']}
+        spending = st.slider("🛍️ Spending Score (1-100)", 1, 100, 50)
         
-        **Spending Behavior:** {profile['Spending Comparison']}
-        
-        **Age Group:** {profile['Age Group']}
-        
-        **Marketing Segment:** {profile['Potential Marketing Segment']}
-        """)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("🔍 Analyze Customer"):
+            # Perform analysis
+            analysis_result = model.analyze_customer_profile(customer_id, gender, age, income, spending)
+            
+            # Display results
+            st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
+            
+            # Cluster Badge
+            st.markdown(f"""
+            <div class="cluster-badge" style="background-color: {analysis_result['cluster_details']['color']}; color: white;">
+                {analysis_result['cluster_details']['icon']} {analysis_result['cluster_details']['name']}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Detailed Analysis
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric("Customer ID", analysis_result['customer_id'])
+                st.metric("Cluster", analysis_result['cluster_details']['name'])
+                st.metric("Cluster Description", analysis_result['cluster_details']['description'])
+            
+            with col2:
+                st.metric("Risk Score", f"{analysis_result['risk_score']:.2f}/100")
+                st.metric("Spending Potential", f"{analysis_result['spending_potential']:.2f}/100")
+                st.metric("Personalized Insight", analysis_result['personalized_insights'])
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # Placeholder tabs for future implementation
+    with tab2:
+        st.markdown("### 📊 Data Overview")
+        st.dataframe(model.df.describe())
+
+    with tab3:
+        st.markdown("### 📈 Visualizations")
+        # Add visualization logic here
+
+    with tab4:
+        st.markdown("### 📋 Full Dataset")
+        st.dataframe(model.df)
+
+    with tab5:
+        st.markdown("### 📊 Cluster Overview")
+        for cluster, details in model.cluster_descriptions.items():
+            if cluster != -1:
+                st.markdown(f"""
+                ### {details['icon']} {details['name']}
+                **Description:** {details['description']}
+                """)
 
 if __name__ == '__main__':
     main()
