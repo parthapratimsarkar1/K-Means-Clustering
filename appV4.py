@@ -1,4 +1,8 @@
 import streamlit as st
+
+# Set page configuration MUST be the first Streamlit command
+st.set_page_config(page_title="DBSCAN Customer Segmentation", page_icon="📊", layout="wide")
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -156,9 +160,6 @@ class DBSCANCustomerSegmentation:
         return plt
 
 def main():
-    # Set page title and icon
-    st.set_page_config(page_title="DBSCAN Customer Segmentation", page_icon="📊")
-    
     # Header
     st.markdown('<div class="main-header"><h1>DBSCAN Customer Segmentation</h1></div>', unsafe_allow_html=True)
     
