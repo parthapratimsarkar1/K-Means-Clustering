@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 
-def load_and_preprocess_data(file_path='Mall_Customers.csv'):
+def load_and_preprocess_data(file_path='Mall_Customers_with_Clusters.csv'):
     # Load the dataset
     data = pd.read_csv(file_path)
     
