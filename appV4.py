@@ -1,4 +1,13 @@
 import streamlit as st
+
+# Set page configuration must be the first Streamlit command
+st.set_page_config(
+    page_title="Customer Segmentation System",
+    page_icon="👥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,6 +18,7 @@ import os
 # Try to import Plotly, but prepare for fallback
 try:
     import plotly.express as px
+    import plotly.graph_objs as go
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
@@ -16,7 +26,7 @@ except ImportError:
 
 warnings.filterwarnings('ignore')
 
-# Enhanced Custom CSS
+# Enhanced Custom CSS with cluster number styling
 st.markdown("""
     <style>
         .main-header {
@@ -45,17 +55,34 @@ st.markdown("""
             margin: 5px 0;
             font-size: 16px;
         }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            background-color: #f0f2f6;
+            color: #333;
+            font-weight: bold;
+            border-radius: 10px;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
+            background-color: #e6e9f0;
+        }
+        .stTabs [data-testid="stMarkdownContainer"] h3 {
+            margin-bottom: 20px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 class CustomerSegmentation:
-    def __init__(self, csv_path='Customer-Dataset-With-ClusteredDB.csv'):
+    def _init_(self, csv_path='Customer-Dataset-With-ClusteredDB.csv'):
         try:
+            # Add error handling for file loading
             if not os.path.exists(csv_path):
                 st.error(f"Error: File {csv_path} not found. Please check the file path.")
                 raise FileNotFoundError(f"Could not find {csv_path}")
 
-            # Attempt to read CSV with multiple encodings
+            # Try multiple encodings
             encodings = ['utf-8', 'latin-1', 'iso-8859-1']
             for encoding in encodings:
                 try:
@@ -67,99 +94,177 @@ class CustomerSegmentation:
                 st.error("Could not read the CSV file with any standard encoding")
                 raise
 
-            # Filter required columns
-            self.df = self.df[['Age', 'Income (INR)', 'Spending (1-100)', 'Gender', 'Cluster']]
-
-            # Check for missing columns
+            # Validate required columns
             required_columns = ['Age', 'Income (INR)', 'Spending (1-100)', 'Gender', 'Cluster']
             missing_columns = [col for col in required_columns if col not in self.df.columns]
+            
             if missing_columns:
                 st.error(f"Missing columns: {missing_columns}")
+                st.error(f"Columns in dataset: {list(self.df.columns)}")
                 raise ValueError(f"Missing required columns: {missing_columns}")
 
             self.process_data()
             self.analyze_clusters()
+            self.generate_cluster_descriptions()
 
         except Exception as e:
             st.error(f"An error occurred while loading the data: {e}")
             raise
-
+            
     def process_data(self):
         le = LabelEncoder()
         self.df['Gender_Encoded'] = le.fit_transform(self.df['Gender'])
         self.gender_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
-
+        
         self.features = ['Age', 'Income (INR)', 'Spending (1-100)']
         self.scaler = StandardScaler()
+        
         try:
             self.scaled_features = self.scaler.fit_transform(self.df[self.features])
         except Exception as e:
             st.error(f"Error in data scaling: {e}")
             raise
-
+    
+    def generate_cluster_descriptions(self):
+        self.cluster_descriptions = {
+           -0: "🏦 Noise Points",
+            0: "🏦 Conservative Spenders (High Income)",
+            1: "⚠ Risk Customers",
+            2: "💎 Premium Customers",
+            3: "⚖ Balanced Group"
+        }
+        
+        self.cluster_details = {
+           -0: "Noise" or "Outliers",
+            0: "Middle Income, Moderate Spending",
+            1: "Low Income, Low Spending",
+            2: "High Income, High Spending",
+            3: "Upper Middle Income, Low Spending"
+        }
+    
     def analyze_clusters(self):
-        self.cluster_centers = self.df.groupby('Cluster')[self.features].mean()
         unique_clusters = sorted(self.df['Cluster'].unique())
         self.cluster_info = {}
-
+        
         for cluster in unique_clusters:
             cluster_data = self.df[self.df['Cluster'] == cluster]
-            self.cluster_info[cluster] = {
-                'size': len(cluster_data),
-                'avg_age': round(cluster_data['Age'].mean(), 1),
-                'avg_income': round(cluster_data['Income (INR)'].mean(), 1),
-                'avg_spending': round(cluster_data['Spending (1-100)'].mean(), 1),
-                'gender_distribution': cluster_data['Gender'].value_counts().to_dict()
-            }
+            
+            if len(cluster_data) > 0:
+                self.cluster_info[cluster] = {
+                    'size': len(cluster_data),
+                    'avg_age': round(cluster_data['Age'].mean(), 1),
+                    'avg_income': round(cluster_data['Income (INR)'].mean(), 1),
+                    'avg_spending': round(cluster_data['Spending (1-100)'].mean(), 1),
+                    'gender_distribution': cluster_data['Gender'].value_counts().to_dict()
+                }
+            else:
+                self.cluster_info[cluster] = {
+                    'size': 0,
+                    'avg_age': 0,
+                    'avg_income': 0,
+                    'avg_spending': 0,
+                    'gender_distribution': {}
+                }
 
     def predict_segment(self, customer_id, gender, age, income, spending):
         input_data = np.array([[age, income, spending]])
         scaled_input = self.scaler.transform(input_data)
-
-        distances = self.cluster_centers.apply(
-            lambda center: np.linalg.norm(scaled_input - self.scaler.transform([center.values])),
-            axis=1
-        )
-        predicted_cluster = distances.idxmin()
+        
+        distances = []
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]
+            cluster_center = cluster_data[self.features].mean()
+            scaled_center = self.scaler.transform([cluster_center])
+            distance = np.linalg.norm(scaled_input - scaled_center)
+            distances.append((cluster, distance))
+        
+        predicted_cluster = min(distances, key=lambda x: x[1])[0]
         return predicted_cluster, self.cluster_info[predicted_cluster]
 
     def create_visualizations(self):
+        # Fallback to Matplotlib if Plotly is not available
         visualizations = {}
+
         if PLOTLY_AVAILABLE:
+            # Plotly visualizations
+            # 1. Cluster Distribution Pie Chart
             cluster_sizes = self.df['Cluster'].value_counts()
             visualizations['cluster_distribution'] = px.pie(
-                values=cluster_sizes.values,
+                values=cluster_sizes.values, 
                 names=cluster_sizes.index.map(lambda x: f"Cluster {x}"),
-                title="Customer Cluster Distribution"
+                title="Customer Cluster Distribution",
+                hole=0.3
+            )
+
+            # 2. Income vs Spending Scatter Plot
+            visualizations['income_vs_spending'] = px.scatter(
+                self.df, 
+                x='Income (INR)', 
+                y='Spending (1-100)', 
+                color='Cluster',
+                title='Income vs Spending by Cluster',
+                labels={'Income (INR)': 'Income (INR)', 'Spending (1-100)': 'Spending Score'},
+                color_discrete_sequence=px.colors.qualitative.Pastel
             )
         else:
+            # Matplotlib fallback visualizations
+            # 1. Cluster Distribution Pie Chart
             plt.figure(figsize=(10, 6))
             cluster_sizes = self.df['Cluster'].value_counts()
             plt.pie(cluster_sizes.values, labels=[f"Cluster {x}" for x in cluster_sizes.index], autopct='%1.1f%%')
             plt.title("Customer Cluster Distribution")
             visualizations['cluster_distribution'] = plt
+
+            # 2. Income vs Spending Scatter Plot
+            plt.figure(figsize=(10, 6))
+            for cluster in self.df['Cluster'].unique():
+                cluster_data = self.df[self.df['Cluster'] == cluster]
+                plt.scatter(cluster_data['Income (INR)'], cluster_data['Spending (1-100)'], 
+                            label=f'Cluster {cluster}')
+            plt.xlabel('Income (INR)')
+            plt.ylabel('Spending Score')
+            plt.title('Income vs Spending by Cluster')
+            plt.legend()
+            visualizations['income_vs_spending'] = plt
+
+        # 3. Age Distribution (works with both Plotly and Matplotlib)
+        plt.figure(figsize=(10, 6))
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]['Age']
+            plt.hist(cluster_data, alpha=0.5, label=f'Cluster {cluster}')
+        plt.xlabel('Age')
+        plt.ylabel('Frequency')
+        plt.title('Age Distribution Across Clusters')
+        plt.legend()
+        visualizations['age_distribution'] = plt
+
         return visualizations
 
 def main():
+    # Header with professional styling
     st.markdown('<div class="main-header"><h1>Customer Segmentation System</h1></div>', unsafe_allow_html=True)
-
+    
     try:
         model = CustomerSegmentation()
     except Exception as e:
         st.error("Failed to initialize the model. Please check your dataset.")
         return
-
-    tab1, tab2, tab3 = st.tabs(["🔍 Customer Analysis", "📈 Visualizations", "📋 Full Dataset"])
-
+    
+    # Main tab navigation
+    tab1, tab2, tab3, tab4 = st.tabs(["🔍 Customer Analysis", "📊 Data Overview", "📈 Visualizations", "📋 Full Dataset"])
+    
     with tab1:
+        # Sidebar with customer inputs
         with st.sidebar:
-            st.markdown("### Customer Profile Analysis")
-            customer_id = st.text_input("Customer ID")
-            gender = st.selectbox("Gender", options=["Male", "Female"])
-            age = st.number_input("Age", min_value=0, max_value=100, value=30)
-            income = st.number_input("Income (INR)", min_value=0, value=50000)
-            spending = st.number_input("Spending (1-100)", min_value=0, max_value=100, value=50)
-
+            st.markdown("### 📊 Customer Profile Analysis")
+            st.markdown("---")
+            
+            customer_id = st.text_input("📋 Customer ID")
+            gender = st.selectbox("👤 Gender", options=["Male", "Female"])
+            age = st.number_input("🎂 Age", min_value=0, max_value=100, value=30)
+            income = st.number_input("💵 Income (INR)", min_value=0, value=50000)
+            spending = st.number_input("🛍 Spending (1-100)", min_value=0, max_value=100, value=50)
+            
             if st.button("Analyze Customer"):
                 if all([customer_id, gender, age, income, spending]):
                     try:
@@ -167,22 +272,69 @@ def main():
                         st.markdown(f"""
                             <div class="cluster-card">
                                 <span class="cluster-badge">Cluster {cluster}</span>
-                                <h4>{cluster}</h4>
-                                <p>Size: {info['size']}</p>
-                                <p>Avg Age: {info['avg_age']}</p>
-                                <p>Avg Income: ₹{info['avg_income']}</p>
-                                <p>Avg Spending: {info['avg_spending']}</p>
+                                <h4>{model.cluster_descriptions[cluster]}</h4>
+                                <p>{model.cluster_details[cluster]}</p>
                             </div>
                         """, unsafe_allow_html=True)
                     except Exception as e:
                         st.error(f"Error in customer analysis: {e}")
-
+                else:
+                    st.warning("⚠ Please complete all fields")
+        
+        # Cluster Overview in first tab
+        st.markdown("### 📊 Cluster Overview")
+        for cluster in sorted(model.cluster_descriptions.keys()):
+            with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
+                info = model.cluster_info.get(cluster, {})
+                st.markdown(f"""
+                    <div class="cluster-card">
+                        <p>{model.cluster_details[cluster]}</p>
+                        <p>👥 Cluster Size: {info['size']} customers</p>
+                        <p>📅 Average Age: {info['avg_age']} years</p>
+                        <p>💰 Average Income: ₹{info['avg_income']:,}</p>
+                        <p>🛍 Average Spending Score: {info['avg_spending']}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+    
     with tab2:
-        visualizations = model.create_visualizations()
-        st.plotly_chart(visualizations['cluster_distribution'])
-
+        st.markdown("### 📊 Comprehensive Data Overview")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 🔢 Basic Statistics")
+            st.dataframe(model.df.describe().T.style.background_gradient())
+        
+        with col2:
+            st.markdown("#### 📊 Cluster Composition")
+            cluster_composition = model.df['Cluster'].value_counts()
+            st.dataframe(cluster_composition)
+        
+        # Detailed breakdown
+        st.markdown("#### 🔍 Detailed Cluster Breakdown")
+        st.dataframe(
+            model.df.groupby('Cluster')[['Age', 'Income (INR)', 'Spending (1-100)']].agg(['mean', 'median', 'std']).style.background_gradient()
+        )
+    
     with tab3:
-        st.dataframe(model.df)
+        st.markdown("### 📈 Visualizations")
+        
+        # Generate visualizations
+        visualizations = model.create_visualizations()
+        
+        # Display visualizations
+        st.pyplot(visualizations['cluster_distribution'])
+        st.pyplot(visualizations['income_vs_spending'])
+        st.pyplot(visualizations['age_distribution'])
 
-if __name__ == '__main__':
-    main()
+        # Warn about Plotly unavailability
+        if not PLOTLY_AVAILABLE:
+            st.warning("Note: Plotly is not installed. Using Matplotlib for visualizations.")
+    
+    with tab4:
+        st.markdown("### 📋 Full Dataset")
+        st.dataframe(model.df.style.background_gradient(subset=['Income (INR)', 'Spending (1-100)'])
+                     .format({'Cluster': 'Cluster {}'}))
+
+if _name_ == '_main_':
+    main()
