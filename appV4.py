@@ -4,6 +4,15 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
+# Cluster Descriptions
+CLUSTER_DESCRIPTIONS = {
+    -1: "🏦 Noise Points: Customers with unique or outlier characteristics",
+    0: "🏦 Conservative Spenders (High Income): Stable customers with high income but moderate spending",
+    1: "⚠️ Risk Customers: Potential high-risk or unpredictable spending pattern",
+    2: "💎 Premium Customers: High-value customers with significant spending capacity",
+    3: "⚖️ Balanced Group: Well-rounded customers with balanced financial behaviors"
+}
+
 def load_data():
     """Load the customer dataset"""
     return pd.read_csv('Customers Dataset DBSCAN With Cluster.csv')
@@ -70,6 +79,12 @@ def main():
         st.subheader('Full Customer Dataset')
         st.dataframe(data)
     
+    # Sidebar option to view cluster descriptions
+    if st.sidebar.button('📊 Cluster Descriptions'):
+        st.subheader('Cluster Descriptions')
+        for cluster, description in CLUSTER_DESCRIPTIONS.items():
+            st.write(f"**Cluster {cluster}**: {description}")
+    
     # Input form
     st.header('Enter Customer Details')
     
@@ -95,7 +110,10 @@ def main():
         
         # Display results
         st.subheader('Clustering Result')
-        st.write(f'Predicted Cluster: {predicted_cluster}')
+        
+        # Show cluster with description and emoji
+        cluster_description = CLUSTER_DESCRIPTIONS.get(predicted_cluster, "Unknown Cluster")
+        st.write(f'Predicted Cluster: {predicted_cluster} - {cluster_description}')
         
         # Additional context about the cluster
         if predicted_cluster != -1:
