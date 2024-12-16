@@ -1,12 +1,51 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 
-def load_and_preprocess_data(file_path='Mall_Customers_with_Clusters.csv'):
-    # Load the dataset
-    data = pd.read_csv(file_path)
+def validate_dataframe(df):
+    """Validate that the DataFrame has required columns"""
+    required_columns = ['Annual Income (k$)', 'Spending Score (1-100)', 'Age']
+    
+    # Check for column existence
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        st.error(f"Missing required columns: {', '.join(missing_columns)}")
+        st.error("Please ensure your CSV has columns: 'Annual Income (k$)', 'Spending Score (1-100)', 'Age'")
+        return False
+    return True
+
+def load_and_preprocess_data():
+    # File upload widget
+    uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=['csv'])
+    
+    # If no file is uploaded, use a sample dataset
+    if uploaded_file is None:
+        st.warning("Please upload a CSV file or use the sample dataset")
+        
+        # Create a sample dataset
+        data = pd.DataFrame({
+            'CustomerID': range(1, 6),
+            'Annual Income (k$)': [15, 35, 50, 70, 90],
+            'Spending Score (1-100)': [40, 60, 50, 70, 30],
+            'Age': [25, 35, 45, 55, 35],
+            'Gender': ['Male', 'Female', 'Male', 'Female', 'Male']
+        })
+        st.info("Using sample dataset for demonstration")
+    else:
+        # Read the uploaded file
+        try:
+            data = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"Error reading the file: {e}")
+            return None, None, None
+    
+    # Validate DataFrame
+    if not validate_dataframe(data):
+        return None, None, None
     
     # Select features for clustering
     X = data[['Annual Income (k$)', 'Spending Score (1-100)']].values
@@ -16,8 +55,11 @@ def load_and_preprocess_data(file_path='Mall_Customers_with_Clusters.csv'):
     X_scaled = scaler.fit_transform(X)
     
     # Apply DBSCAN
-    dbscan = DBSCAN(eps=0.5, min_samples=4)
+    dbscan = DBSCAN(eps=0.5, min_samples=2)
     labels = dbscan.fit_predict(X_scaled)
+    
+    # Add cluster labels to the dataframe
+    data['Cluster'] = labels
     
     return data, scaler, dbscan
 
@@ -49,6 +91,14 @@ def main():
     
     # Load data and prepare clustering model
     data, scaler, dbscan = load_and_preprocess_data()
+    
+    # If no valid data, stop here
+    if data is None:
+        return
+    
+    # Show dataset preview
+    st.sidebar.subheader('Dataset Preview')
+    st.sidebar.dataframe(data.head())
     
     # Sidebar for input
     st.sidebar.header('Customer Details')
@@ -99,14 +149,14 @@ def main():
             
             # Visualize position relative to other clusters
             st.subheader('Customer Position Relative to Clusters')
-            fig, ax = plt.subplots(figsize=(10, 6))
-            scatter = ax.scatter(
+            plt.figure(figsize=(10, 6))
+            scatter = plt.scatter(
                 data['Annual Income (k$)'], 
                 data['Spending Score (1-100)'], 
                 c=data['Cluster'], 
                 cmap='viridis'
             )
-            ax.scatter(
+            plt.scatter(
                 annual_income, 
                 spending_score, 
                 color='red', 
@@ -114,12 +164,12 @@ def main():
                 s=200, 
                 label='New Customer'
             )
-            ax.set_xlabel('Annual Income (k$)')
-            ax.set_ylabel('Spending Score (1-100)')
-            ax.set_title('Customer Positioning')
+            plt.xlabel('Annual Income (k$)')
+            plt.ylabel('Spending Score (1-100)')
+            plt.title('Customer Positioning')
             plt.colorbar(scatter, label='Cluster')
-            ax.legend()
-            st.pyplot(fig)
+            plt.legend()
+            st.pyplot(plt)
         else:
             st.success(f'Cluster {cluster}: Customer belongs to Cluster {cluster}')
             
