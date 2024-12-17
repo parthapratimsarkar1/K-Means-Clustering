@@ -2,7 +2,7 @@ import streamlit as st
 
 # Set page configuration must be the first Streamlit command
 st.set_page_config(
-    page_title="Customer Segmentation System",
+    page_title="Customer Segmentation System Using KMeans",
     page_icon="👥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -240,7 +240,7 @@ class CustomerSegmentation:
 
 def main():
     # Header with professional styling
-    st.markdown('<div class="main-header"><h1>Customer Segmentation System</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h2>Customer Segmentation System Using KMeans</h2></div>', unsafe_allow_html=True)
     
     try:
         model = CustomerSegmentation()
