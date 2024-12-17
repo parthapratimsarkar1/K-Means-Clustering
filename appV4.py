@@ -117,20 +117,21 @@ class CustomerSegmentation:
             raise
     
     def generate_cluster_descriptions(self):
+        # Updated descriptions based on the specific cluster characteristics
         self.cluster_descriptions = {
-           -1: "🏦 Noise Points",
-            0: "🏦 Conservative Spenders (High Income)",
-            1: "⚠️ Risk Customers",
-            2: "💎 Premium Customers",
-            3: "⚖️ Balanced Group"
+            -1: "🔍 Outliers & Unique Customers",  # 21 customers, mixed income and moderate spending
+            0: "💼 Middle Income, Stable Spenders",  # 109 customers, moderate income and spending
+            1: "💡 Low Budget Segment",  # 12 customers, low income and very low spending
+            2: "💎 Premium High Spenders",  # 32 customers, high income and high spending
+            3: "⚖️ High Income, Conservative Spenders"  # 26 customers, high income but low spending
         }
         
         self.cluster_details = {
-           -1: "Noise" or "Outliers",
-            0: "Middle Income, Moderate Spending",
-            1: "Low Income, Low Spending",
-            2: "High Income, High Spending",
-            3: "Upper Middle Income, Low Spending"
+            -1: f"Outliers (21 customers): Average Income ₹{78810:.0f}, Average Spending 55",
+            0: f"Middle Income Group (109 customers): Average Income ₹{49734:.0f}, Average Spending 53",
+            1: f"Budget Constrained (12 customers): Average Income ₹{24583:.0f}, Very Low Spending 10",
+            2: f"Premium Customers (32 customers): Average Income ₹{80375:.0f}, High Spending 83",
+            3: f"Conservative High Earners (26 customers): Average Income ₹{83423:.0f}, Low Spending 14"
         }
     
     def analyze_clusters(self):
