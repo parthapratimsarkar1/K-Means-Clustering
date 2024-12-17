@@ -108,6 +108,16 @@ if file:
         else:
             st.warning("Please select at least two features to visualize the clusters.")
 
+        # Cluster Characteristics Analysis
+        st.write("### Cluster Characteristics Analysis")
+        cluster_summary = df.groupby('Cluster').mean()
+        st.write(cluster_summary.style.background_gradient(cmap="coolwarm"))
+
+        st.write("### Cluster Characteristics Summary")
+        for cluster_id, cluster_data in cluster_summary.iterrows():
+            st.write(f"*Cluster {cluster_id}:*")
+            st.write(cluster_data.to_frame().T)
+
         # Download clustered dataset
         st.sidebar.header("💾 Download Results")
         csv = df.to_csv(index=False).encode('utf-8')
