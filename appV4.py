@@ -7,23 +7,51 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Set Streamlit page configuration
-st.set_page_config(page_title="Customer Segmentation", layout="wide")
+st.set_page_config(page_title="Customer Segmentation", layout="wide", page_icon="📊")
 
-# Title
-st.title("Customer Segmentation System")
+# Add custom CSS for aesthetics
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #f9f9f9;
+    }
+    .stButton > button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+    .stButton > button:hover {
+        background-color: #45a049;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Title with emoji
+st.title("📊 Customer Segmentation System")
 
 # Sidebar for user input
-st.sidebar.header("Upload Your Dataset")
+st.sidebar.header("📂 Upload Your Dataset")
 file = st.sidebar.file_uploader("Upload CSV File", type=["csv"])
 
 if file:
     # Load the dataset
     df = pd.read_csv(file)
     st.write("### Uploaded Dataset")
-    st.dataframe(df)
+    st.dataframe(df.style.background_gradient(cmap="coolwarm"))
 
     # Select columns for clustering
-    st.sidebar.header("Clustering Configuration")
+    st.sidebar.header("⚙ Clustering Configuration")
     columns = st.sidebar.multiselect("Select Features for Clustering", df.columns)
 
     if columns:
@@ -59,7 +87,7 @@ if file:
         # Add cluster labels to the dataset
         df['Cluster'] = labels
         st.write("### Clustered Dataset")
-        st.dataframe(df)
+        st.dataframe(df.style.background_gradient(cmap="viridis"))
 
         # Visualize clusters (2D)
         st.write("### Cluster Visualization")
@@ -71,16 +99,17 @@ if file:
             sns.scatterplot(
                 x=df[x_col], y=df[y_col], hue=labels, palette="viridis", style=labels, ax=ax
             )
-            ax.set_title("Clustering Results")
-            ax.set_xlabel(x_col)
-            ax.set_ylabel(y_col)
+            ax.set_title("Clustering Results", fontsize=16)
+            ax.set_xlabel(x_col, fontsize=12)
+            ax.set_ylabel(y_col, fontsize=12)
+            plt.legend(title="Clusters", bbox_to_anchor=(1.05, 1), loc='upper left')
             st.pyplot(fig)
 
         else:
             st.warning("Please select at least two features to visualize the clusters.")
 
         # Download clustered dataset
-        st.sidebar.header("Download Results")
+        st.sidebar.header("💾 Download Results")
         csv = df.to_csv(index=False).encode('utf-8')
         st.sidebar.download_button(
             label="Download Clustered Dataset",
@@ -92,4 +121,4 @@ if file:
     else:
         st.warning("Please select features for clustering.")
 else:
-    st.info("Awaiting CSV file upload...")
+    st.info("Awaiting CSV file upload...")
