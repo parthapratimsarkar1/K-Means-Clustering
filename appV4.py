@@ -119,20 +119,22 @@ class CustomerSegmentation:
     def generate_cluster_descriptions(self):
         # Updated descriptions based on the specific cluster characteristics
         self.cluster_descriptions = {
-            -1: "🔍 Outliers & Unique Customers",  # 21 customers, mixed income and moderate spending
-            0: "💼 Middle Income, Stable Spenders",  # 109 customers, moderate income and spending
-            1: "💡 Low Budget Segment",  # 12 customers, low income and very low spending
-            2: "💎 Premium High Spenders",  # 32 customers, high income and high spending
-            3: "⚖️ High Income, Conservative Spenders"  # 26 customers, high income but low spending
+            -1: "🔍 Outliers & Unique Customers",
+            0: "💼 Middle Income, Stable Spenders",
+            1: "💡 Low Budget Segment",
+            2: "💎 Premium High Spenders",
+            3: "⚖️ High Income, Conservative Spenders"
         }
         
-        self.cluster_details = {
-            -1: f"Outliers (21 customers): Average Income ₹{78810:.0f}, Average Spending 55",
-            0: f"Middle Income Group (109 customers): Average Income ₹{49734:.0f}, Average Spending 53",
-            1: f"Budget Constrained (12 customers): Average Income ₹{24583:.0f}, Very Low Spending 10",
-            2: f"Premium Customers (32 customers): Average Income ₹{80375:.0f}, High Spending 83",
-            3: f"Conservative High Earners (26 customers): Average Income ₹{83423:.0f}, Low Spending 14"
-        }
+        self.cluster_details = {}
+        for cluster in self.df['Cluster'].unique():
+            cluster_data = self.df[self.df['Cluster'] == cluster]
+            self.cluster_details[cluster] = (
+                f"{self.cluster_descriptions.get(cluster, 'Unnamed Cluster')} "
+                f"({len(cluster_data)} customers): "
+                f"Avg Income ₹{cluster_data['Income (INR)'].mean():.0f}, "
+                f"Avg Spending {cluster_data['Spending (1-100)'].mean():.1f}"
+            )
     
     def analyze_clusters(self):
         unique_clusters = sorted(self.df['Cluster'].unique())
@@ -162,14 +164,15 @@ class CustomerSegmentation:
         input_data = np.array([[age, income, spending]])
         scaled_input = self.scaler.transform(input_data)
         
+        # Find the cluster of the closest existing data point
         distances = []
-        for cluster in self.df['Cluster'].unique():
-            cluster_data = self.df[self.df['Cluster'] == cluster]
-            cluster_center = cluster_data[self.features].mean()
-            scaled_center = self.scaler.transform([cluster_center])
-            distance = np.linalg.norm(scaled_input - scaled_center)
+        for idx, row in self.df[self.features].iterrows():
+            scaled_row = self.scaler.transform([row])
+            distance = np.linalg.norm(scaled_input - scaled_row)
+            cluster = self.df.loc[idx, 'Cluster']
             distances.append((cluster, distance))
         
+        # Get the cluster with the minimum distance
         predicted_cluster = min(distances, key=lambda x: x[1])[0]
         return predicted_cluster, self.cluster_info[predicted_cluster]
 
@@ -261,11 +264,11 @@ def main():
                 if all([customer_id, gender, age, income, spending]):
                     try:
                         cluster, info = model.predict_segment(customer_id, gender, age, income, spending)
+                        # Use the exact cluster description from the cluster details
                         st.markdown(f"""
                             <div class="cluster-card">
                                 <span class="cluster-badge">Cluster {cluster}</span>
-                                <h4>{model.cluster_descriptions[cluster]}</h4>
-                                <p>{model.cluster_details[cluster]}</p>
+                                <h4>{model.cluster_details[cluster]}</h4>
                             </div>
                         """, unsafe_allow_html=True)
                     except Exception as e:
@@ -275,8 +278,8 @@ def main():
         
         # Cluster Overview in first tab
         st.markdown("### 📊 Cluster Overview")
-        for cluster in sorted(model.cluster_descriptions.keys()):
-            with st.expander(f"Cluster {cluster} | {model.cluster_descriptions[cluster]}"):
+        for cluster in sorted(model.df['Cluster'].unique()):
+            with st.expander(f"Cluster {cluster} Details"):
                 info = model.cluster_info.get(cluster, {})
                 st.markdown(f"""
                     <div class="cluster-card">
