@@ -9,15 +9,7 @@ import streamlit as st
 
 class CustomerSegmentation:
     def __init__(self, csv_path='Customers Dataset DBSCAN.csv'):
-        """
-        Initialize customer segmentation with DBSCAN clustering
-        
-        Parameters:
-        -----------
-        csv_path : str, optional (default='Customers Dataset DBSCAN.csv')
-            Path to the input CSV file containing customer data
-        """
-        # Define required columns explicitly
+        # Normalize column names by stripping whitespace
         self.required_columns = ['Age', 'Income (INR)', 'Spending (1-100)', 'Gender']
         
         # Load the data
@@ -35,13 +27,7 @@ class CustomerSegmentation:
     def load_data(self, csv_path):
         """
         Load and validate customer data from CSV file
-        
-        Parameters:
-        -----------
-        csv_path : str
-            Path to the CSV file
         """
-        # Extensive error checking and reporting
         try:
             # Check if file exists
             if not os.path.exists(csv_path):
@@ -51,10 +37,14 @@ class CustomerSegmentation:
             # Try multiple encodings
             encodings = ['utf-8', 'latin-1', 'iso-8859-1']
             
-            # Attempt to read file with different encodings
             for encoding in encodings:
                 try:
+                    # Read CSV with stripped column names
                     self.df = pd.read_csv(csv_path, encoding=encoding)
+                    
+                    # Strip whitespace from column names
+                    self.df.columns = [col.strip() for col in self.df.columns]
+                    
                     break
                 except UnicodeDecodeError:
                     continue
@@ -62,16 +52,30 @@ class CustomerSegmentation:
                 st.error("Could not read CSV file with any standard encoding")
                 raise ValueError("Could not read CSV file with any standard encoding")
             
-            # Print available columns for debugging
-            st.write("Available columns:", list(self.df.columns))
+            # Comprehensive column checking
+            st.write("Available columns (after stripping):", list(self.df.columns))
             
-            # Validate required columns
-            missing_columns = [col for col in self.required_columns if col not in self.df.columns]
+            # Validate required columns with case-insensitive and whitespace-insensitive check
+            missing_columns = []
+            for req_col in self.required_columns:
+                # Check if any column matches the required column (case and whitespace insensitive)
+                matching_cols = [col for col in self.df.columns if req_col.lower() in col.lower()]
+                if not matching_cols:
+                    missing_columns.append(req_col)
             
             if missing_columns:
                 st.error(f"Missing required columns: {missing_columns}")
                 st.error(f"Columns in dataset: {list(self.df.columns)}")
                 raise ValueError(f"Missing required columns: {missing_columns}")
+            
+            # Rename columns to match required names if needed
+            column_mapping = {
+                col: req_col 
+                for req_col in self.required_columns 
+                for col in self.df.columns 
+                if req_col.lower() in col.lower()
+            }
+            self.df.rename(columns=column_mapping, inplace=True)
             
             st.success(f"Data loaded successfully. Shape: {self.df.shape}")
             print(f"Data loaded successfully. Shape: {self.df.shape}")
@@ -105,14 +109,7 @@ class CustomerSegmentation:
     
     def apply_dbscan(self, eps=0.5, min_samples=5):
         """
-        Apply DBSCAN clustering
-        
-        Parameters:
-        -----------
-        eps : float, optional (default=0.5)
-            Maximum distance between two samples to be considered in the same neighborhood
-        min_samples : int, optional (default=5)
-            Minimum number of samples in a neighborhood for a point to be considered a core point
+        Apply DBSCAN clustering with error handling and visualization
         """
         try:
             # Apply DBSCAN
@@ -166,6 +163,7 @@ def main():
     
     if uploaded_file is not None:
         # Save the uploaded file temporarily
+        os.makedirs("tempDir", exist_ok=True)
         with open(os.path.join("tempDir", uploaded_file.name), "wb") as f:
             f.write(uploaded_file.getbuffer())
         
@@ -173,13 +171,8 @@ def main():
             # Initialize customer segmentation with the uploaded file
             segmentation = CustomerSegmentation(os.path.join("tempDir", uploaded_file.name))
             
-            # Additional Streamlit-specific visualizations could be added here
-            
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
 if __name__ == '__main__':
-    # Ensure temp directory exists
-    os.makedirs("tempDir", exist_ok=True)
-    
     main()
