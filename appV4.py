@@ -110,7 +110,9 @@ if file:
 
         # Cluster Characteristics Analysis
         st.write("### Cluster Characteristics Analysis")
-        cluster_summary = df.groupby('Cluster').mean()
+        # Filter only numeric columns for summary
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        cluster_summary = df.groupby('Cluster')[numeric_columns].mean()
         st.write(cluster_summary.style.background_gradient(cmap="coolwarm"))
 
         st.write("### Cluster Characteristics Summary")
